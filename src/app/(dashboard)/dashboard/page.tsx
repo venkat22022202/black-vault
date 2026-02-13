@@ -4,118 +4,72 @@ import { motion } from "framer-motion";
 import {
   DollarSign,
   TrendingUp,
-  TrendingDown,
   Activity,
   Zap,
   ArrowUpRight,
+  Key,
+  Shield,
+  Lock,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-// ============================================
-// MOCK DATA (replace with tRPC queries later)
-// ============================================
-const costCards = [
-  {
-    label: "Today",
-    amount: 4.23,
-    change: 12,
-    trend: "up" as const,
-    color: "text-neon-green",
-    borderColor: "border-neon-green/20",
-    bgGlow: "bg-neon-green/5",
-  },
-  {
-    label: "This Week",
-    amount: 28.91,
-    change: -3,
-    trend: "down" as const,
-    color: "text-neon-purple",
-    borderColor: "border-neon-purple/20",
-    bgGlow: "bg-neon-purple/5",
-  },
-  {
-    label: "This Month",
-    amount: 127.44,
-    change: 8,
-    trend: "up" as const,
-    color: "text-neon-cyan",
-    borderColor: "border-neon-cyan/20",
-    bgGlow: "bg-neon-cyan/5",
-  },
-];
-
-const providerSpend = [
-  { name: "Anthropic", amount: 52.1, percentage: 41, color: "bg-[#D4A574]" },
-  { name: "OpenAI", amount: 41.3, percentage: 32, color: "bg-[#10A37F]" },
-  { name: "Google AI", amount: 22.04, percentage: 17, color: "bg-[#4285F4]" },
-  { name: "Replicate", amount: 12.0, percentage: 10, color: "bg-white/80" },
-];
-
-const recentActivity = [
-  {
-    time: "12:04:23",
-    provider: "Claude 3.5",
-    agent: "research-agent",
-    tokens: 1247,
-    cost: 0.003,
-    color: "text-neon-green",
-  },
-  {
-    time: "12:04:21",
-    provider: "GPT-4o",
-    agent: "code-review",
-    tokens: 892,
-    cost: 0.002,
-    color: "text-neon-purple",
-  },
-  {
-    time: "12:03:58",
-    provider: "Gemini 2",
-    agent: "summarizer",
-    tokens: 2100,
-    cost: 0.001,
-    color: "text-neon-cyan",
-  },
-  {
-    time: "12:03:45",
-    provider: "Claude 3.5",
-    agent: "writing-agent",
-    tokens: 430,
-    cost: 0.001,
-    color: "text-neon-green",
-  },
-  {
-    time: "12:03:30",
-    provider: "GPT-4o",
-    agent: "data-analysis",
-    tokens: 1580,
-    cost: 0.004,
-    color: "text-neon-purple",
-  },
-  {
-    time: "12:03:12",
-    provider: "Claude 3.5",
-    agent: "research-agent",
-    tokens: 890,
-    cost: 0.002,
-    color: "text-neon-green",
-  },
-];
+import { trpc } from "@/lib/trpc";
+import Link from "next/link";
 
 export default function DashboardPage() {
+  const { data: keys, isLoading } = trpc.vault.getAll.useQuery();
+
+  const totalKeys = keys?.length ?? 0;
+  const activeKeys = keys?.filter((k) => k.isActive).length ?? 0;
+
   return (
     <div className="space-y-8">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary">Dashboard</h1>
         <p className="text-sm text-text-secondary mt-1">
-          Real-time overview of your AI agent activity and spend.
+          Your AI agent command center. Everything at a glance.
         </p>
       </div>
 
-      {/* Cost Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {costCards.map((card, i) => (
+      {/* Stats Cards - Real Data */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            label: "Vault Keys",
+            value: isLoading ? "..." : String(totalKeys),
+            icon: Key,
+            color: "text-neon-green",
+            borderColor: "border-neon-green/20",
+            bgGlow: "bg-neon-green/5",
+          },
+          {
+            label: "Active Keys",
+            value: isLoading ? "..." : String(activeKeys),
+            icon: Shield,
+            color: "text-neon-cyan",
+            borderColor: "border-neon-cyan/20",
+            bgGlow: "bg-neon-cyan/5",
+          },
+          {
+            label: "Providers",
+            value: isLoading
+              ? "..."
+              : String(new Set(keys?.map((k) => k.provider)).size),
+            icon: Activity,
+            color: "text-neon-purple",
+            borderColor: "border-neon-purple/20",
+            bgGlow: "bg-neon-purple/5",
+          },
+          {
+            label: "Plan",
+            value: "Free",
+            icon: Zap,
+            color: "text-neon-amber",
+            borderColor: "border-neon-amber/20",
+            bgGlow: "bg-neon-amber/5",
+          },
+        ].map((card, i) => (
           <motion.div
             key={card.label}
             initial={{ opacity: 0, y: 20 }}
@@ -130,31 +84,23 @@ export default function DashboardPage() {
             <div className="relative z-10">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm text-text-muted">{card.label}</span>
-                <div
-                  className={cn(
-                    "flex items-center gap-1 text-xs font-medium",
-                    card.trend === "up" ? "text-neon-green" : "text-neon-red"
-                  )}
-                >
-                  {card.trend === "up" ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  {Math.abs(card.change)}%
-                </div>
+                <card.icon className={cn("w-4 h-4", card.color)} />
               </div>
               <div className={cn("text-3xl font-mono font-bold", card.color)}>
-                ${card.amount.toFixed(2)}
+                {isLoading && card.value === "..." ? (
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                ) : (
+                  card.value
+                )}
               </div>
             </div>
           </motion.div>
         ))}
       </div>
 
-      {/* Two Column Layout */}
+      {/* Main content area */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Spend by Provider */}
+        {/* Recent Vault Keys */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -163,35 +109,70 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-neon-green" />
-              Spend by Provider
+              <Lock className="w-4 h-4 text-neon-green" />
+              Recent Vault Keys
             </h2>
-            <span className="text-xs text-text-muted">This month</span>
+            <Link
+              href="/vault"
+              className="text-xs text-neon-green hover:underline"
+            >
+              View All
+            </Link>
           </div>
 
-          <div className="space-y-4">
-            {providerSpend.map((p) => (
-              <div key={p.name}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-text-secondary">{p.name}</span>
-                  <span className="text-sm font-mono text-text-primary">
-                    ${p.amount.toFixed(2)}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-5 h-5 text-neon-green animate-spin" />
+            </div>
+          ) : keys && keys.length > 0 ? (
+            <div className="space-y-3">
+              {keys.slice(0, 5).map((key, i) => (
+                <motion.div
+                  key={key.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.4 + i * 0.08 }}
+                  className="flex items-center justify-between py-2 border-b border-void-300/50 last:border-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded bg-void-200 flex items-center justify-center">
+                      <Key className="w-3 h-3 text-text-muted" />
+                    </div>
+                    <div>
+                      <div className="text-sm text-text-primary">{key.label}</div>
+                      <div className="text-xs text-text-muted font-mono">
+                        {key.keyPrefix}
+                      </div>
+                    </div>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-xs px-2 py-0.5 rounded-full",
+                      key.isActive
+                        ? "bg-neon-green/10 text-neon-green"
+                        : "bg-void-300 text-text-muted"
+                    )}
+                  >
+                    {key.isActive ? "Active" : "Off"}
                   </span>
-                </div>
-                <div className="h-2 rounded-full bg-void-300 overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${p.percentage}%` }}
-                    transition={{ duration: 1, delay: 0.5 }}
-                    className={cn("h-full rounded-full", p.color)}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Key className="w-8 h-8 text-text-muted mx-auto mb-2" />
+              <p className="text-sm text-text-muted mb-3">No keys yet</p>
+              <Link
+                href="/vault"
+                className="inline-flex items-center gap-1 text-xs text-neon-green hover:underline"
+              >
+                Add your first key <ArrowUpRight className="w-3 h-3" />
+              </Link>
+            </div>
+          )}
         </motion.div>
 
-        {/* Live Activity */}
+        {/* Getting Started / Cost Preview */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -200,40 +181,65 @@ export default function DashboardPage() {
         >
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
-              <Activity className="w-4 h-4 text-neon-cyan" />
-              Live Activity
+              <TrendingUp className="w-4 h-4 text-neon-purple" />
+              Getting Started
             </h2>
-            <span className="flex items-center gap-1.5 text-xs text-neon-green">
-              <span className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
-              Live
-            </span>
           </div>
 
-          <div className="space-y-3 font-mono text-xs">
-            {recentActivity.map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: 0.5 + i * 0.08 }}
-                className="flex items-center gap-3 py-1.5 border-b border-void-300/50 last:border-0"
+          <div className="space-y-4">
+            {[
+              {
+                step: "01",
+                title: "Add your API keys",
+                description: "Store keys from OpenAI, Anthropic, Google, and more",
+                done: totalKeys > 0,
+                href: "/vault",
+              },
+              {
+                step: "02",
+                title: "Browse the agent registry",
+                description: "Discover and review community AI agents",
+                done: false,
+                href: "/agents",
+              },
+              {
+                step: "03",
+                title: "Upgrade to Pro",
+                description: "Unlock 50 keys, cost analytics, and budget alerts",
+                done: false,
+                href: "/billing",
+              },
+            ].map((item) => (
+              <Link
+                key={item.step}
+                href={item.href}
+                className="flex items-start gap-3 p-3 rounded-lg hover:bg-void-200/50 transition-colors group"
               >
-                <span className="text-text-muted w-16 shrink-0">
-                  {item.time}
-                </span>
-                <span className={cn("w-20 shrink-0 truncate", item.color)}>
-                  {item.provider}
-                </span>
-                <span className="text-text-secondary truncate flex-1">
-                  {item.agent}
-                </span>
-                <span className="text-text-muted shrink-0">
-                  {item.tokens.toLocaleString()} tok
-                </span>
-                <span className="text-text-primary shrink-0 w-14 text-right">
-                  ${item.cost.toFixed(3)}
-                </span>
-              </motion.div>
+                <div
+                  className={cn(
+                    "w-7 h-7 rounded-md flex items-center justify-center text-xs font-mono font-bold shrink-0",
+                    item.done
+                      ? "bg-neon-green/10 text-neon-green"
+                      : "bg-void-200 text-text-muted"
+                  )}
+                >
+                  {item.done ? "✓" : item.step}
+                </div>
+                <div>
+                  <div
+                    className={cn(
+                      "text-sm font-medium",
+                      item.done
+                        ? "text-text-muted line-through"
+                        : "text-text-primary"
+                    )}
+                  >
+                    {item.title}
+                  </div>
+                  <div className="text-xs text-text-muted">{item.description}</div>
+                </div>
+                <ArrowUpRight className="w-4 h-4 text-text-muted group-hover:text-neon-green transition-colors ml-auto shrink-0 mt-0.5" />
+              </Link>
             ))}
           </div>
         </motion.div>
@@ -251,22 +257,22 @@ export default function DashboardPage() {
             label: "Add API Key",
             href: "/vault",
             icon: Zap,
-            description: "Secure a new provider key",
+            description: "Encrypt and store a provider key",
           },
           {
             label: "Browse Agents",
             href: "/agents",
             icon: Activity,
-            description: "Discover community agents",
+            description: "Discover community AI agents",
           },
           {
-            label: "Set Budget Alert",
-            href: "/settings",
+            label: "Upgrade Plan",
+            href: "/billing",
             icon: DollarSign,
-            description: "Get notified before limits",
+            description: "Unlock Pro features",
           },
         ].map((action) => (
-          <a
+          <Link
             key={action.label}
             href={action.href}
             className="group flex items-center justify-between rounded-xl border border-void-300 bg-void-50 p-4 hover:border-void-400 hover:bg-void-100 transition-all"
@@ -277,13 +283,11 @@ export default function DashboardPage() {
                 <div className="text-sm font-medium text-text-primary">
                   {action.label}
                 </div>
-                <div className="text-xs text-text-muted">
-                  {action.description}
-                </div>
+                <div className="text-xs text-text-muted">{action.description}</div>
               </div>
             </div>
             <ArrowUpRight className="w-4 h-4 text-text-muted group-hover:text-neon-green transition-colors" />
-          </a>
+          </Link>
         ))}
       </motion.div>
     </div>

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -30,6 +31,9 @@ export default function DashboardShell({
 }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: keys } = trpc.vault.getAll.useQuery();
+  const keyCount = keys?.length ?? 0;
+  const maxKeys = 3; // free plan
 
   return (
     <div className="min-h-screen bg-void-0">
@@ -96,12 +100,18 @@ export default function DashboardShell({
         <div className="absolute bottom-4 left-3 right-3">
           <div className="rounded-lg border border-void-300 bg-void-100 p-3">
             <div className="text-xs text-text-muted mb-1">Free Plan</div>
-            <div className="text-xs text-text-secondary">3 / 3 keys used</div>
+            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys} keys used</div>
             <div className="mt-2 h-1.5 rounded-full bg-void-300 overflow-hidden">
-              <div className="h-full w-full rounded-full bg-neon-green" />
+              <div
+                className={cn(
+                  "h-full rounded-full transition-all",
+                  keyCount >= maxKeys ? "bg-neon-amber" : "bg-neon-green"
+                )}
+                style={{ width: `${Math.min((keyCount / maxKeys) * 100, 100)}%` }}
+              />
             </div>
             <Link
-              href="/settings"
+              href="/billing"
               className="mt-2 block text-xs text-neon-green hover:underline"
             >
               Upgrade to Pro

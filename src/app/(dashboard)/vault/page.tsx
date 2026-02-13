@@ -12,55 +12,47 @@ import {
   ToggleRight,
   Search,
   Shield,
+  Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { PROVIDERS, PROVIDER_LIST, type ProviderId } from "@/lib/constants";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 // ============================================
-// MOCK DATA (replace with tRPC)
-// ============================================
-const mockKeys = [
-  {
-    id: "1",
-    provider: "anthropic" as ProviderId,
-    label: "Production Claude Key",
-    keyPrefix: "sk-ant-xxxx****xxxx",
-    isActive: true,
-    monthlyBudget: 50,
-    currentSpend: 34.21,
-    lastUsedAt: new Date(Date.now() - 120000),
-  },
-  {
-    id: "2",
-    provider: "openai" as ProviderId,
-    label: "GPT-4o Dev Key",
-    keyPrefix: "sk-proj-xxxx****xxxx",
-    isActive: true,
-    monthlyBudget: 100,
-    currentSpend: 67.89,
-    lastUsedAt: new Date(Date.now() - 3600000),
-  },
-  {
-    id: "3",
-    provider: "google" as ProviderId,
-    label: "Gemini API Key",
-    keyPrefix: "AIza****xxxx",
-    isActive: false,
-    monthlyBudget: null,
-    currentSpend: 12.4,
-    lastUsedAt: new Date(Date.now() - 86400000),
-  },
-];
-
-// ============================================
-// ADD KEY MODAL
+// ADD KEY MODAL - wired to tRPC
 // ============================================
 function AddKeyModal({ onClose }: { onClose: () => void }) {
   const [provider, setProvider] = useState<ProviderId>("openai");
   const [label, setLabel] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [budget, setBudget] = useState("");
+  const utils = trpc.useUtils();
+
+  const createKey = trpc.vault.create.useMutation({
+    onSuccess: () => {
+      utils.vault.getAll.invalidate();
+      toast.success("API key encrypted and saved!");
+      onClose();
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to save key");
+    },
+  });
+
+  const handleSubmit = () => {
+    if (!label.trim() || !apiKey.trim()) {
+      toast.error("Label and API key are required");
+      return;
+    }
+    createKey.mutate({
+      provider,
+      label: label.trim(),
+      apiKey: apiKey.trim(),
+      monthlyBudget: budget ? Number(budget) : undefined,
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -76,29 +68,21 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
         </h2>
 
         <div className="space-y-4">
-          {/* Provider */}
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">
-              Provider
-            </label>
+            <label className="block text-xs text-text-muted mb-1.5">Provider</label>
             <select
               value={provider}
               onChange={(e) => setProvider(e.target.value as ProviderId)}
               className="w-full rounded-lg border border-void-300 bg-void-200 px-3 py-2.5 text-sm text-text-primary focus:border-neon-green focus:outline-none focus:ring-1 focus:ring-neon-green/30"
             >
               {PROVIDER_LIST.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
+                <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </select>
           </div>
 
-          {/* Label */}
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">
-              Label
-            </label>
+            <label className="block text-xs text-text-muted mb-1.5">Label</label>
             <input
               type="text"
               value={label}
@@ -108,11 +92,8 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          {/* API Key */}
           <div>
-            <label className="block text-xs text-text-muted mb-1.5">
-              API Key
-            </label>
+            <label className="block text-xs text-text-muted mb-1.5">API Key</label>
             <input
               type="password"
               value={apiKey}
@@ -122,15 +103,12 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
             />
           </div>
 
-          {/* Monthly Budget */}
           <div>
             <label className="block text-xs text-text-muted mb-1.5">
               Monthly Budget (optional)
             </label>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">
-                $
-              </span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">$</span>
               <input
                 type="number"
                 value={budget}
@@ -149,7 +127,14 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
           >
             Cancel
           </button>
-          <button className="flex-1 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]">
+          <button
+            onClick={handleSubmit}
+            disabled={createKey.isPending}
+            className="flex-1 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {createKey.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : null}
             Encrypt & Save
           </button>
         </div>
@@ -159,33 +144,83 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
 }
 
 // ============================================
-// KEY CARD
+// KEY CARD - wired to tRPC
 // ============================================
-function KeyCard({
-  item,
-}: {
-  item: (typeof mockKeys)[0];
-}) {
-  const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const provider = PROVIDERS[item.provider];
-  const budgetPercentage = item.monthlyBudget
-    ? (item.currentSpend / item.monthlyBudget) * 100
-    : 0;
-  const isWarning = budgetPercentage > 80;
+interface VaultKeyItem {
+  id: string;
+  provider: string;
+  label: string;
+  keyPrefix: string;
+  isActive: boolean;
+  monthlyBudget: number | null;
+  lastUsedAt: string | Date | null;
+  createdAt: string | Date;
+}
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(item.keyPrefix);
+function KeyCard({ item }: { item: VaultKeyItem }) {
+  const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const utils = trpc.useUtils();
+
+  const provider = PROVIDERS[item.provider as ProviderId] ?? PROVIDERS.other;
+
+  const revealMutation = trpc.vault.reveal.useMutation({
+    onSuccess: (data) => {
+      setRevealedKey(data.apiKey);
+      // Auto-hide after 10 seconds
+      setTimeout(() => setRevealedKey(null), 10000);
+    },
+    onError: () => toast.error("Failed to decrypt key"),
+  });
+
+  const toggleMutation = trpc.vault.toggleActive.useMutation({
+    onSuccess: () => {
+      utils.vault.getAll.invalidate();
+      toast.success(item.isActive ? "Key disabled" : "Key enabled");
+    },
+  });
+
+  const deleteMutation = trpc.vault.delete.useMutation({
+    onSuccess: () => {
+      utils.vault.getAll.invalidate();
+      toast.success("Key deleted permanently");
+    },
+  });
+
+  const handleCopy = async () => {
+    if (revealedKey) {
+      await navigator.clipboard.writeText(revealedKey);
+    } else {
+      // Reveal first, then copy
+      const result = await revealMutation.mutateAsync({ id: item.id });
+      await navigator.clipboard.writeText(result.apiKey);
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+    toast.success("Key copied to clipboard");
+  };
+
+  const handleReveal = () => {
+    if (revealedKey) {
+      setRevealedKey(null);
+    } else {
+      revealMutation.mutate({ id: item.id });
+    }
+  };
+
+  const handleDelete = () => {
+    if (confirm("Are you sure? This permanently deletes the encrypted key.")) {
+      deleteMutation.mutate({ id: item.id });
+    }
   };
 
   const lastUsed = item.lastUsedAt
     ? (() => {
-        const diff = Date.now() - item.lastUsedAt.getTime();
+        const diff = Date.now() - new Date(item.lastUsedAt).getTime();
         if (diff < 60000) return `${Math.floor(diff / 1000)}s ago`;
         if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-        return `${Math.floor(diff / 3600000)}h ago`;
+        if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+        return `${Math.floor(diff / 86400000)}d ago`;
       })()
     : "Never";
 
@@ -209,9 +244,7 @@ function KeyCard({
             {provider.name.slice(0, 2).toUpperCase()}
           </div>
           <div>
-            <div className="text-sm font-medium text-text-primary">
-              {item.label}
-            </div>
+            <div className="text-sm font-medium text-text-primary">{item.label}</div>
             <div className="text-xs text-text-muted">{provider.name}</div>
           </div>
         </div>
@@ -230,13 +263,16 @@ function KeyCard({
       {/* Key display */}
       <div className="flex items-center gap-2 mb-3 p-2.5 rounded-lg bg-void-200 border border-void-300">
         <code className="text-xs font-mono text-text-secondary flex-1 truncate">
-          {revealed ? "sk-ant-api03-real-key-would-be-here" : item.keyPrefix}
+          {revealedKey ?? item.keyPrefix}
         </code>
         <button
-          onClick={() => setRevealed(!revealed)}
+          onClick={handleReveal}
+          disabled={revealMutation.isPending}
           className="p-1 rounded hover:bg-void-300 text-text-muted hover:text-text-primary transition-colors"
         >
-          {revealed ? (
+          {revealMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : revealedKey ? (
             <EyeOff className="w-3.5 h-3.5" />
           ) : (
             <Eye className="w-3.5 h-3.5" />
@@ -248,46 +284,24 @@ function KeyCard({
         >
           <Copy className="w-3.5 h-3.5" />
         </button>
-        {copied && (
-          <span className="text-xs text-neon-green">Copied!</span>
-        )}
+        {copied && <span className="text-xs text-neon-green">Copied!</span>}
       </div>
 
       {/* Meta row */}
       <div className="flex items-center gap-4 text-xs text-text-muted mb-3">
         <span>Last used: {lastUsed}</span>
         {item.monthlyBudget && (
-          <span>
-            Budget: ${item.currentSpend.toFixed(2)} / ${item.monthlyBudget}
-          </span>
+          <span>Budget: ${item.monthlyBudget}/mo</span>
         )}
       </div>
 
-      {/* Budget bar */}
-      {item.monthlyBudget && (
-        <div className="mb-3">
-          <div className="h-1.5 rounded-full bg-void-300 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${Math.min(budgetPercentage, 100)}%` }}
-              transition={{ duration: 1 }}
-              className={cn(
-                "h-full rounded-full",
-                isWarning ? "bg-neon-amber" : "bg-neon-green"
-              )}
-            />
-          </div>
-          {isWarning && (
-            <span className="text-xs text-neon-amber mt-1 inline-block">
-              {budgetPercentage.toFixed(0)}% of budget used
-            </span>
-          )}
-        </div>
-      )}
-
       {/* Actions */}
       <div className="flex items-center gap-2 pt-2 border-t border-void-300/50">
-        <button className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors p-1.5 rounded hover:bg-void-200">
+        <button
+          onClick={() => toggleMutation.mutate({ id: item.id })}
+          disabled={toggleMutation.isPending}
+          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-text-primary transition-colors p-1.5 rounded hover:bg-void-200"
+        >
           {item.isActive ? (
             <ToggleRight className="w-4 h-4 text-neon-green" />
           ) : (
@@ -295,8 +309,16 @@ function KeyCard({
           )}
           {item.isActive ? "Disable" : "Enable"}
         </button>
-        <button className="flex items-center gap-1.5 text-xs text-text-muted hover:text-neon-red transition-colors p-1.5 rounded hover:bg-void-200 ml-auto">
-          <Trash2 className="w-3.5 h-3.5" />
+        <button
+          onClick={handleDelete}
+          disabled={deleteMutation.isPending}
+          className="flex items-center gap-1.5 text-xs text-text-muted hover:text-neon-red transition-colors p-1.5 rounded hover:bg-void-200 ml-auto"
+        >
+          {deleteMutation.isPending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5" />
+          )}
           Delete
         </button>
       </div>
@@ -305,13 +327,15 @@ function KeyCard({
 }
 
 // ============================================
-// VAULT PAGE
+// VAULT PAGE - real data from DB
 // ============================================
 export default function VaultPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [search, setSearch] = useState("");
 
-  const filteredKeys = mockKeys.filter(
+  const { data: keys, isLoading } = trpc.vault.getAll.useQuery();
+
+  const filteredKeys = (keys ?? []).filter(
     (k) =>
       k.label.toLowerCase().includes(search.toLowerCase()) ||
       k.provider.toLowerCase().includes(search.toLowerCase())
@@ -351,24 +375,43 @@ export default function VaultPage() {
         />
       </div>
 
-      {/* Keys Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {filteredKeys.map((key) => (
-          <KeyCard key={key.id} item={key} />
-        ))}
-      </div>
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 text-neon-green animate-spin" />
+        </div>
+      )}
 
-      {filteredKeys.length === 0 && (
+      {/* Keys Grid */}
+      {!isLoading && filteredKeys.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filteredKeys.map((key) => (
+            <KeyCard key={key.id} item={key} />
+          ))}
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!isLoading && filteredKeys.length === 0 && (
         <div className="text-center py-16">
           <Key className="w-12 h-12 text-text-muted mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text-primary mb-1">
-            No keys found
+            {search ? "No keys match your search" : "Your vault is empty"}
           </h3>
-          <p className="text-sm text-text-secondary">
+          <p className="text-sm text-text-secondary mb-6">
             {search
               ? "Try a different search term"
-              : "Add your first API key to get started"}
+              : "Add your first API key to encrypt and store it securely."}
           </p>
+          {!search && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-6 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
+            >
+              <Plus className="w-4 h-4" />
+              Add Your First Key
+            </button>
+          )}
         </div>
       )}
 
