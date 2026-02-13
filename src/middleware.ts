@@ -1,4 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 const isProtectedRoute = createRouteMatcher([
   "/dashboard(.*)",
@@ -9,7 +11,14 @@ const isProtectedRoute = createRouteMatcher([
   "/workflows(.*)",
 ]);
 
+const isProxyRoute = (req: NextRequest) =>
+  req.nextUrl.pathname.startsWith("/api/proxy/");
+
 export default clerkMiddleware(async (auth, req) => {
+  // Skip Clerk auth for proxy routes — they use their own bvt_ token auth
+  if (isProxyRoute(req)) {
+    return NextResponse.next();
+  }
   if (isProtectedRoute(req)) {
     await auth.protect();
   }
