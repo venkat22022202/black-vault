@@ -44,6 +44,13 @@ export async function cached<T>(
 }
 
 /**
+ * Invalidate the public stats cache (user/key/agent/workflow counts)
+ */
+export async function invalidatePublicStats(): Promise<void> {
+  return invalidateCache("stats:public");
+}
+
+/**
  * Invalidate a cache key
  */
 export async function invalidateCache(key: string): Promise<void> {

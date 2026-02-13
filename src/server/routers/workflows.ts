@@ -5,6 +5,7 @@ import { workflows, workflowStars, users } from "@/server/db/schema";
 import { eq, and, ilike, or, sql, desc, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "@/server/services/activity";
+import { invalidatePublicStats } from "@/server/services/redis";
 
 function slugify(text: string): string {
   return text
@@ -188,6 +189,8 @@ export const workflowsRouter = router({
         { workflowId: workflow.id, slug }
       );
 
+      invalidatePublicStats().catch(() => {});
+
       return workflow;
     }),
 
@@ -235,6 +238,8 @@ export const workflowsRouter = router({
         `Forked "${original.name}" → "${forked.name}"`,
         { originalId: input.workflowId, forkedId: forked.id }
       );
+
+      invalidatePublicStats().catch(() => {});
 
       return forked;
     }),

@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { logActivity } from "@/server/services/activity";
 import { checkRateLimit } from "@/server/services/ratelimit";
 import { invalidateProxySessionsForKey } from "@/server/services/proxy-auth";
+import { invalidatePublicStats } from "@/server/services/redis";
 
 export const vaultRouter = router({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -71,6 +72,8 @@ export const vaultRouter = router({
         `New API key encrypted and stored`,
         { keyId: key.id, provider: input.provider }
       );
+
+      invalidatePublicStats().catch(() => {});
 
       return {
         id: key.id,
@@ -195,6 +198,8 @@ export const vaultRouter = router({
           { provider: key.provider }
         );
       }
+
+      invalidatePublicStats().catch(() => {});
 
       return { success: true };
     }),

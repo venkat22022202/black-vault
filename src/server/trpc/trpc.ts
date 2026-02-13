@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
 import { ZodError } from "zod";
+import { invalidatePublicStats } from "@/server/services/redis";
 
 export interface Context {
   userId: string | null;
@@ -48,6 +49,11 @@ export async function createContext(): Promise<Context> {
           .returning({ id: users.id });
 
         dbUserId = newUser?.id ?? null;
+
+        // Invalidate public stats cache so user count updates
+        if (dbUserId) {
+          invalidatePublicStats().catch(() => {});
+        }
 
         // If onConflictDoNothing hit (race condition), fetch again
         if (!dbUserId) {

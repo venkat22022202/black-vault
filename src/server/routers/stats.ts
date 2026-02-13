@@ -6,7 +6,7 @@ import { cached } from "@/server/services/redis";
 
 export const statsRouter = router({
   getPublicStats: publicProcedure.query(async () => {
-    return cached("stats:public", 300, async () => {
+    return cached("stats:public", 60, async () => {
       const [[userCount], [keyCount], [agentCount], [workflowCount]] =
         await Promise.all([
           db.select({ count: sql<number>`count(*)` }).from(users),

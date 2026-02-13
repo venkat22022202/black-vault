@@ -6,6 +6,7 @@ import { eq, and, ilike, or, sql, desc, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { logActivity } from "@/server/services/activity";
 import { checkRateLimit } from "@/server/services/ratelimit";
+import { invalidatePublicStats } from "@/server/services/redis";
 
 function slugify(text: string): string {
   return text
@@ -199,6 +200,8 @@ export const agentsRouter = router({
         `New agent "${input.name}" added to the registry`,
         { agentId: agent.id, category: input.category }
       );
+
+      invalidatePublicStats().catch(() => {});
 
       return agent;
     }),
