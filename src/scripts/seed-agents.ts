@@ -4,6 +4,7 @@ config({ path: ".env.local" });
 import { neon } from "@neondatabase/serverless";
 import { drizzle } from "drizzle-orm/neon-http";
 import { agents } from "@/server/db/schema";
+import { eq } from "drizzle-orm";
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql);
@@ -14,6 +15,16 @@ const SEED_AGENTS = [
     slug: "claude-code",
     description: "Autonomous coding agent by Anthropic. Reads, writes, and debugs code across entire codebases.",
     longDescription: "Claude Code is Anthropic's CLI-based coding agent that can autonomously navigate codebases, write and edit files, run tests, and handle complex multi-step development tasks. It understands project context deeply and can make coordinated changes across many files.",
+    pitch: "I'm Claude Code. Give me a codebase and I'll navigate it, understand the architecture, write new features, fix bugs, refactor code, and run your tests — all from the terminal. I think step-by-step and make coordinated changes across dozens of files at once.",
+    capabilities: [
+      "Autonomous multi-file code editing",
+      "Deep codebase understanding and navigation",
+      "Test writing and debugging",
+      "Git operations and commit management",
+      "Shell command execution",
+      "Architectural refactoring across entire projects",
+    ],
+    howItWorks: "I work directly in your terminal as a CLI tool. Point me at your repo and describe what you need. I'll read the relevant files, understand the patterns and architecture, plan my approach, then make precise edits across as many files as needed. I can run tests to verify my work and iterate until everything passes.",
     category: "Coding",
     provider: "Anthropic",
     websiteUrl: "https://claude.ai",
@@ -32,6 +43,16 @@ const SEED_AGENTS = [
     slug: "cursor-agent",
     description: "AI-powered code editor agent. Context-aware completions and multi-file editing with deep codebase understanding.",
     longDescription: "Cursor is an AI-first code editor built on VS Code. Its agent mode can plan and execute multi-step coding tasks, understand your entire project context, and make intelligent edits across multiple files simultaneously.",
+    pitch: "I'm Cursor Agent. I live inside your editor and I see everything — your codebase, your open files, your recent changes. Ask me to build a feature and I'll plan the approach, edit multiple files, and even run your terminal commands. I'm your pair programmer who never sleeps.",
+    capabilities: [
+      "Context-aware code completions",
+      "Multi-file simultaneous editing",
+      "Codebase-wide search and understanding",
+      "Inline chat for targeted changes",
+      "Terminal command integration",
+      "Tab completion with next-edit prediction",
+    ],
+    howItWorks: "I'm built into the Cursor IDE (a VS Code fork). I index your entire codebase to build a deep understanding of your project. When you ask me to make changes, I can see all your files, understand imports and dependencies, and make coordinated edits across your project. I predict your next edit and offer it as a tab completion.",
     category: "Coding",
     provider: "Cursor",
     websiteUrl: "https://cursor.com",
@@ -49,6 +70,16 @@ const SEED_AGENTS = [
     slug: "perplexity-research",
     description: "Deep web research agent. Multi-step search, source verification, and comprehensive report generation.",
     longDescription: "Perplexity's Deep Research mode conducts thorough multi-step research across the web, verifying sources, cross-referencing information, and generating comprehensive reports with citations. Great for due diligence, market research, and technical investigations.",
+    pitch: "I'm Perplexity Deep Research. Give me a question and I'll scour the internet, cross-reference dozens of sources, verify claims, and deliver a comprehensive research report with proper citations. I don't just search — I investigate.",
+    capabilities: [
+      "Multi-step web research with source verification",
+      "Comprehensive report generation with citations",
+      "Cross-referencing information across sources",
+      "Real-time web access for current data",
+      "Academic and technical paper analysis",
+      "Market research and competitive analysis",
+    ],
+    howItWorks: "I break your research question into sub-queries, search the web for each one, read and analyze the results, cross-reference claims across multiple sources, then synthesize everything into a structured report. Every claim is backed by a citation you can verify yourself.",
     category: "Research",
     provider: "Perplexity",
     websiteUrl: "https://perplexity.ai",
@@ -66,6 +97,16 @@ const SEED_AGENTS = [
     slug: "devin",
     description: "Fully autonomous software engineer. Plans, codes, tests, and deploys complete features independently.",
     longDescription: "Devin by Cognition Labs is a fully autonomous software engineer that can plan entire feature implementations, write code, set up environments, run tests, debug issues, and even deploy — all independently with minimal human guidance.",
+    pitch: "I'm Devin, the first AI software engineer. Hand me a GitHub issue or a Slack message and I'll plan the implementation, write the code, set up my own dev environment, run the tests, debug failures, and open a PR — all on my own. I work like a junior dev on your team.",
+    capabilities: [
+      "End-to-end feature implementation from spec",
+      "Autonomous environment setup and configuration",
+      "Test writing, running, and debugging",
+      "Pull request creation and iteration",
+      "Multi-language and multi-framework support",
+      "Long-running autonomous task execution",
+    ],
+    howItWorks: "I receive tasks via Slack, GitHub issues, or direct instructions. I plan the implementation by breaking it into steps, spin up my own sandboxed dev environment, write code, install dependencies, run tests, and iterate until everything works. Then I open a PR for your review.",
     category: "Coding",
     provider: "Cognition",
     websiteUrl: "https://devin.ai",
@@ -83,6 +124,16 @@ const SEED_AGENTS = [
     slug: "gpt-researcher",
     description: "Open-source autonomous research agent. Generates detailed reports from multiple web sources with citations.",
     longDescription: "GPT Researcher is an open-source agent that autonomously conducts comprehensive research on any topic. It generates long-form reports by scraping and synthesizing information from 20+ web sources, complete with proper citations and source verification.",
+    pitch: "I'm GPT Researcher. I'm open-source and I take research seriously. Give me any topic and I'll autonomously search 20+ web sources, read them thoroughly, cross-reference the information, and produce a detailed research report with full citations. No hallucinations — just verified facts.",
+    capabilities: [
+      "Autonomous multi-source web research",
+      "Long-form report generation",
+      "Source verification and citation",
+      "Scraping and synthesis of 20+ sources",
+      "Customizable research depth and focus",
+      "Export to multiple formats",
+    ],
+    howItWorks: "I use a plan-and-execute architecture. First, I generate a research plan with sub-questions. Then I search the web for each sub-question, scrape and read the top results, extract relevant information, cross-reference facts, and finally compile everything into a structured report with proper citations.",
     category: "Research",
     provider: "Community",
     websiteUrl: "https://gptr.dev",
@@ -101,6 +152,16 @@ const SEED_AGENTS = [
     slug: "v0-vercel",
     description: "AI UI generator. Describe interfaces in natural language, get production-ready React + Tailwind code instantly.",
     longDescription: "v0 is Vercel's generative UI tool that converts natural language descriptions into polished, production-ready React components using Tailwind CSS and shadcn/ui. It can generate full page layouts, complex forms, dashboards, and interactive components.",
+    pitch: "I'm v0. Describe any UI you can imagine and I'll generate production-ready React components with Tailwind CSS and shadcn/ui. Landing pages, dashboards, complex forms, interactive widgets — just tell me what you want and I'll build it in seconds. Copy the code and ship it.",
+    capabilities: [
+      "Natural language to production React code",
+      "Tailwind CSS + shadcn/ui components",
+      "Full page layout generation",
+      "Interactive component creation",
+      "Responsive design out of the box",
+      "Iterative refinement through conversation",
+    ],
+    howItWorks: "Describe the UI you want in plain English. I'll generate a complete React component using Tailwind CSS and shadcn/ui best practices. You can preview it live, iterate on it through conversation, and copy the production-ready code directly into your project.",
     category: "Design",
     provider: "Vercel",
     websiteUrl: "https://v0.dev",
@@ -118,6 +179,16 @@ const SEED_AGENTS = [
     slug: "windsurf",
     description: "AI-powered IDE with Cascade agent. Deep codebase awareness, multi-file edits, and terminal integration.",
     longDescription: "Windsurf by Codeium is an AI-native IDE featuring the Cascade agent — a deep reasoning engine that understands your entire codebase, can make multi-file edits, run terminal commands, and manage complex refactoring tasks with full project context.",
+    pitch: "I'm Cascade, the AI brain inside Windsurf. I don't just autocomplete — I deeply reason about your codebase. I track every file you change, understand the ripple effects of edits, and can execute multi-step coding workflows that span your entire project. Think of me as an IDE that thinks.",
+    capabilities: [
+      "Deep codebase reasoning and understanding",
+      "Multi-file coordinated editing",
+      "Terminal command execution",
+      "Automatic dependency tracking",
+      "Real-time code flow analysis",
+      "Context-aware refactoring",
+    ],
+    howItWorks: "I index your entire codebase and maintain a live understanding of your project's architecture. When you ask me to make changes, I trace the impact across files, suggest coordinated edits, and can execute multi-step plans — reading files, writing code, and running commands in sequence.",
     category: "Coding",
     provider: "Codeium",
     websiteUrl: "https://codeium.com/windsurf",
@@ -135,6 +206,16 @@ const SEED_AGENTS = [
     slug: "bolt-new",
     description: "Full-stack web app generator. Describe your app, get a running project with frontend, backend, and database.",
     longDescription: "Bolt.new by StackBlitz generates complete full-stack web applications from natural language descriptions. It sets up frontend, backend, database schemas, and deployment configuration — producing a running app in a WebContainer that you can iterate on.",
+    pitch: "I'm Bolt.new. Tell me what app you want and I'll build the entire thing — frontend, backend, database, and all. I run everything in a WebContainer so you can see your app running live as I build it. From idea to working prototype in minutes, not days.",
+    capabilities: [
+      "Full-stack app generation from description",
+      "Live WebContainer preview",
+      "Frontend + backend + database setup",
+      "Real-time iterative development",
+      "Dependency management",
+      "One-click deployment",
+    ],
+    howItWorks: "Describe your app idea in plain language. I'll scaffold the entire project — choosing the right frameworks, setting up the database schema, building the UI, writing the API routes, and running everything in a live WebContainer. You see the app running as I build it, and you can ask me to iterate.",
     category: "Coding",
     provider: "StackBlitz",
     websiteUrl: "https://bolt.new",
@@ -152,6 +233,16 @@ const SEED_AGENTS = [
     slug: "lovable",
     description: "AI full-stack engineer. Build production-ready web apps with natural language — design, code, and deploy.",
     longDescription: "Lovable (formerly GPT Engineer) is an AI full-stack engineer that can build complete production-ready web applications from natural language prompts. It handles UI design, frontend code, backend logic, database setup, and deployment.",
+    pitch: "I'm Lovable. I turn your ideas into production-ready web apps. Describe what you want — I'll design the UI, write the frontend and backend code, set up the database, and deploy it. I specialize in making beautiful, functional apps that you'd actually want to use.",
+    capabilities: [
+      "End-to-end web app creation",
+      "Beautiful UI design from descriptions",
+      "Supabase database integration",
+      "Authentication and user management",
+      "Responsive design and styling",
+      "One-click deployment to production",
+    ],
+    howItWorks: "Tell me what you want to build. I'll create a complete web app with a beautiful UI, set up Supabase for the backend and database, add authentication if needed, and make everything responsive. You can iterate on the design through conversation and deploy with one click.",
     category: "Coding",
     provider: "Lovable",
     websiteUrl: "https://lovable.dev",
@@ -169,6 +260,16 @@ const SEED_AGENTS = [
     slug: "jasper-ai",
     description: "Enterprise writing agent. Blog posts, marketing copy, social media content with brand voice matching.",
     longDescription: "Jasper is an enterprise AI writing platform that generates marketing copy, blog posts, social media content, and business communications. It can match your brand voice, follow style guides, and produce content across 30+ languages.",
+    pitch: "I'm Jasper. I write like your brand talks. Give me your brand guidelines and I'll produce blog posts, ad copy, social media content, emails, and landing pages that sound authentically yours. I speak 30+ languages and never miss a deadline.",
+    capabilities: [
+      "Brand voice matching and consistency",
+      "Blog post and long-form content generation",
+      "Marketing copy and ad creation",
+      "Social media content planning",
+      "Email campaign writing",
+      "Multi-language content (30+ languages)",
+    ],
+    howItWorks: "I learn your brand voice from your existing content and style guides. When you need new content, I generate drafts that match your tone, terminology, and messaging framework. I can produce everything from tweets to full blog posts, and I adapt to different channels and audiences automatically.",
     category: "Writing",
     provider: "Jasper",
     websiteUrl: "https://jasper.ai",
@@ -186,6 +287,16 @@ const SEED_AGENTS = [
     slug: "midjourney",
     description: "AI image generation via Discord. Create stunning art, illustrations, and photorealistic images from text prompts.",
     longDescription: "Midjourney is a leading AI image generator accessible through Discord. It creates stunning photorealistic images, artistic illustrations, concept art, and design assets from text descriptions. Known for its exceptional aesthetic quality.",
+    pitch: "I'm Midjourney. Describe any image you can imagine and I'll create it — photorealistic portraits, fantasy landscapes, product mockups, abstract art. My aesthetic quality is unmatched. I turn words into visual masterpieces that stop people mid-scroll.",
+    capabilities: [
+      "Photorealistic image generation",
+      "Artistic illustration and concept art",
+      "Style transfer and artistic references",
+      "High-resolution upscaling",
+      "Variation and iteration on designs",
+      "Product mockup and design asset creation",
+    ],
+    howItWorks: "Send me a text prompt through Discord or the web app. I'll interpret your description, apply my understanding of aesthetics and composition, and generate multiple image variations. You can upscale your favorites, create variations, or refine with more specific prompts.",
     category: "Design",
     provider: "Midjourney",
     websiteUrl: "https://midjourney.com",
@@ -203,6 +314,16 @@ const SEED_AGENTS = [
     slug: "autogpt",
     description: "Open-source autonomous AI agent. Chain multiple GPT-4 calls to accomplish complex tasks independently.",
     longDescription: "AutoGPT is an open-source autonomous AI agent that chains multiple LLM calls together to break down and accomplish complex tasks. It can browse the web, manage files, execute code, and self-correct — all with minimal human intervention.",
+    pitch: "I'm AutoGPT. Give me a goal and I'll figure out how to achieve it — step by step, autonomously. I can browse the web, write and run code, manage files, and chain together as many AI calls as it takes. I'm the OG autonomous agent, and I'm completely open-source.",
+    capabilities: [
+      "Autonomous goal decomposition and execution",
+      "Web browsing and information gathering",
+      "Code writing and execution",
+      "File management and creation",
+      "Self-correction and iterative improvement",
+      "Plugin ecosystem for extended capabilities",
+    ],
+    howItWorks: "Give me a high-level goal. I'll break it down into sub-tasks, execute each one using the tools available to me (web browser, code executor, file system), evaluate the results, and iterate until the goal is achieved. I maintain memory across steps and can self-correct when things go wrong.",
     category: "Automation",
     provider: "Community",
     websiteUrl: "https://agpt.co",
@@ -221,6 +342,16 @@ const SEED_AGENTS = [
     slug: "crewai",
     description: "Multi-agent orchestration framework. Define teams of AI agents with roles, goals, and collaboration patterns.",
     longDescription: "CrewAI is a framework for orchestrating multiple AI agents working together. You define agent roles, goals, and backstories, then let them collaborate on complex tasks — from research to content creation to code review — with built-in task delegation.",
+    pitch: "I'm CrewAI. I don't work alone — I orchestrate entire teams of AI agents. Define roles like Researcher, Writer, and Editor, give them goals, and watch them collaborate. They delegate tasks, share findings, and produce results that no single agent could achieve alone.",
+    capabilities: [
+      "Multi-agent team orchestration",
+      "Role-based agent definition",
+      "Autonomous task delegation between agents",
+      "Sequential and parallel workflow execution",
+      "Built-in memory and context sharing",
+      "Integration with any LLM provider",
+    ],
+    howItWorks: "You define a crew of agents, each with a role, goal, and backstory. Then you define tasks and assign them. I orchestrate the execution — agents work on their tasks, share information, delegate sub-tasks to each other, and produce a final output. Think of it as a virtual team sprint.",
     category: "Automation",
     provider: "Community",
     websiteUrl: "https://crewai.com",
@@ -239,6 +370,16 @@ const SEED_AGENTS = [
     slug: "elevenlabs-voice",
     description: "Conversational AI voice agent. Natural-sounding voice synthesis with real-time dialogue capabilities.",
     longDescription: "ElevenLabs' Voice Agent provides ultra-realistic voice synthesis and real-time conversational AI capabilities. It can handle phone calls, customer support, and interactive voice experiences with near-human quality speech in 29+ languages.",
+    pitch: "I'm ElevenLabs Voice Agent. I don't type — I talk. With near-human voice quality in 29+ languages, I can handle phone calls, provide customer support, narrate content, and carry on natural conversations. People genuinely can't tell I'm not human.",
+    capabilities: [
+      "Ultra-realistic voice synthesis",
+      "Real-time conversational dialogue",
+      "29+ language support",
+      "Custom voice cloning",
+      "Phone call handling",
+      "Emotion and tone modulation",
+    ],
+    howItWorks: "I combine state-of-the-art text-to-speech with real-time language understanding. When someone speaks to me, I understand their intent, formulate a response, and deliver it with natural-sounding speech — including appropriate pauses, emphasis, and emotional tone. I can be configured with custom voices and personalities.",
     category: "Automation",
     provider: "ElevenLabs",
     websiteUrl: "https://elevenlabs.io",
@@ -256,6 +397,16 @@ const SEED_AGENTS = [
     slug: "replit-agent",
     description: "AI coding agent in the cloud. Build, run, and deploy apps entirely from natural language instructions.",
     longDescription: "Replit Agent is a cloud-based AI coding assistant that can build entire applications from scratch. It handles project setup, code writing, dependency management, debugging, and deployment — all within Replit's cloud IDE environment.",
+    pitch: "I'm Replit Agent. I build apps in the cloud — no local setup needed. Tell me what you want, and I'll create the project, install dependencies, write the code, debug issues, and deploy to production. Everything happens in your browser. From zero to deployed in one conversation.",
+    capabilities: [
+      "Cloud-based app development",
+      "Project scaffolding and setup",
+      "Dependency installation and management",
+      "Real-time code preview",
+      "One-click production deployment",
+      "Built-in database and hosting",
+    ],
+    howItWorks: "I work entirely in the cloud through Replit's platform. Describe your app and I'll create a new project, choose the right language and framework, install packages, write the code, and set up the database. You can see the app running in real-time as I build it, and deploy to production with one click.",
     category: "Coding",
     provider: "Replit",
     websiteUrl: "https://replit.com",
@@ -271,18 +422,56 @@ const SEED_AGENTS = [
 ];
 
 async function seed() {
-  console.log("Seeding agents...");
+  console.log("Seeding agents...\n");
 
   for (const agent of SEED_AGENTS) {
     try {
-      await db.insert(agents).values(agent).onConflictDoNothing();
-      console.log(`  ✓ ${agent.name}`);
+      // Try to update existing agent first (by slug)
+      const [existing] = await db
+        .select({ id: agents.id })
+        .from(agents)
+        .where(eq(agents.slug, agent.slug))
+        .limit(1);
+
+      if (existing) {
+        await db
+          .update(agents)
+          .set({
+            pitch: agent.pitch,
+            capabilities: agent.capabilities,
+            howItWorks: agent.howItWorks,
+            status: "approved",
+            // Also update other fields in case they changed
+            description: agent.description,
+            longDescription: agent.longDescription,
+            category: agent.category,
+            provider: agent.provider,
+            websiteUrl: agent.websiteUrl,
+            githubUrl: agent.githubUrl ?? null,
+            avgCostPerRun: agent.avgCostPerRun,
+            permissionsRequired: agent.permissionsRequired,
+            trustScore: agent.trustScore,
+            totalReviews: agent.totalReviews,
+            totalUpvotes: agent.totalUpvotes,
+            isVerified: agent.isVerified,
+            isFeatured: agent.isFeatured,
+            tags: agent.tags,
+          })
+          .where(eq(agents.id, existing.id));
+        console.log(`  ↻ Updated: ${agent.name}`);
+      } else {
+        await db.insert(agents).values({
+          ...agent,
+          status: "approved",
+        });
+        console.log(`  ✓ Inserted: ${agent.name}`);
+      }
     } catch (err) {
       console.error(`  ✗ ${agent.name}:`, err);
     }
   }
 
-  console.log(`\nDone! Seeded ${SEED_AGENTS.length} agents.`);
+  console.log(`\nDone! Processed ${SEED_AGENTS.length} agents.`);
 }
 
 seed().catch(console.error);
