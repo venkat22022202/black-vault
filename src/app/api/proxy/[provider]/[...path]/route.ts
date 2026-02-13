@@ -243,7 +243,7 @@ async function handleProxy(
   });
  } catch (err) {
     return NextResponse.json(
-      { error: "Internal proxy error", details: err instanceof Error ? err.message : String(err) },
+      { error: "Internal proxy error", v: 2, details: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined },
       { status: 500, headers: CORS_HEADERS }
     );
   }
