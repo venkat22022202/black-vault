@@ -16,6 +16,15 @@ const bytea = customType<{ data: Buffer }>({
   dataType() {
     return "bytea";
   },
+  fromDriver(value: unknown): Buffer {
+    if (Buffer.isBuffer(value)) return value;
+    if (typeof value === "string") {
+      // Neon returns bytea as hex string like \x1a2b3c...
+      const hex = value.startsWith("\\x") ? value.slice(2) : value;
+      return Buffer.from(hex, "hex");
+    }
+    return Buffer.from(value as ArrayBuffer);
+  },
 });
 
 // ============================================

@@ -53,5 +53,5 @@ export function decryptApiKey(
   });
   decipher.setAuthTag(authTag);
 
-  return decipher.update(encryptedData) + decipher.final("utf8");
+  return decipher.update(encryptedData, undefined, "utf8") + decipher.final("utf8");
 }
