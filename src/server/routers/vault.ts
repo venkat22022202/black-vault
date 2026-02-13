@@ -1,13 +1,14 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/trpc";
 import { db } from "@/server/db";
-import { vaultKeys } from "@/server/db/schema";
+import { vaultKeys, proxySessions } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { encryptApiKey, decryptApiKey } from "@/server/services/encryption";
 import { maskApiKey } from "@/lib/utils";
 import { randomUUID } from "crypto";
 import { logActivity } from "@/server/services/activity";
 import { checkRateLimit } from "@/server/services/ratelimit";
+import { invalidateProxySessionsForKey } from "@/server/services/proxy-auth";
 
 export const vaultRouter = router({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -144,6 +145,21 @@ export const vaultRouter = router({
         .where(
           and(eq(vaultKeys.id, id), eq(vaultKeys.userId, ctx.dbUserId))
         );
+
+      // If explicitly setting isActive to false, kill proxy sessions
+      if (updates.isActive === false) {
+        await db
+          .update(proxySessions)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(proxySessions.vaultKeyId, id),
+              eq(proxySessions.isActive, true)
+            )
+          );
+        await invalidateProxySessionsForKey(id);
+      }
+
       return { success: true };
     }),
 
@@ -157,6 +173,9 @@ export const vaultRouter = router({
           and(eq(vaultKeys.id, input.id), eq(vaultKeys.userId, ctx.dbUserId))
         )
         .limit(1);
+
+      // Invalidate proxy session cache BEFORE the FK cascade deletes the rows
+      await invalidateProxySessionsForKey(input.id);
 
       await db
         .delete(vaultKeys)
@@ -200,6 +219,20 @@ export const vaultRouter = router({
         .update(vaultKeys)
         .set({ isActive: !key.isActive, updatedAt: new Date() })
         .where(eq(vaultKeys.id, input.id));
+
+      // When disabling: kill all proxy sessions + invalidate cache
+      if (key.isActive) {
+        await db
+          .update(proxySessions)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(proxySessions.vaultKeyId, input.id),
+              eq(proxySessions.isActive, true)
+            )
+          );
+        await invalidateProxySessionsForKey(input.id);
+      }
 
       logActivity(
         ctx.dbUserId,

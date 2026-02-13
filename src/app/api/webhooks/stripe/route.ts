@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 
-// Stripe integration is not active — payments are handled via Razorpay.
-// This endpoint returns 410 Gone to clearly signal it's decommissioned.
+// Stripe integration removed — payments not active during beta.
 export async function POST() {
   return NextResponse.json(
-    { error: "This endpoint is no longer active. Use the Razorpay webhook instead." },
+    { error: "Payments are not active during the beta period." },
     { status: 410 }
   );
 }

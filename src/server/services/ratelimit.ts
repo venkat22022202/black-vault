@@ -37,6 +37,7 @@ const LIMITS = {
   vaultReveal: { requests: 5, window: "1 m" },
   vaultCreate: { requests: 10, window: "1 m" },
   agentSubmit: { requests: 3, window: "1 m" },
+  proxyRequest: { requests: 200, window: "1 m" },
 } as const;
 
 export async function checkRateLimit(
@@ -54,4 +55,22 @@ export async function checkRateLimit(
       message: `Rate limit exceeded. Try again in ${Math.ceil(result.reset - Date.now() / 1000)}s.`,
     });
   }
+}
+
+/**
+ * Proxy-specific rate limit check (non-tRPC, returns boolean).
+ * Returns { allowed: true } or { allowed: false, retryAfter: seconds }.
+ */
+export async function checkProxyRateLimit(
+  userId: string
+): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
+  const config = LIMITS.proxyRequest;
+  const limiter = getLimiter("proxyRequest", config.requests, config.window);
+  if (!limiter) return { allowed: true };
+
+  const result = await limiter.limit(userId);
+  if (!result.success) {
+    return { allowed: false, retryAfter: Math.ceil((result.reset - Date.now()) / 1000) };
+  }
+  return { allowed: true };
 }

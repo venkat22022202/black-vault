@@ -10,6 +10,7 @@ import { ACTIVITY_TYPES } from "@/lib/constants";
 const FILTER_TABS = [
   { key: "all", label: "All" },
   { key: "key", label: "Keys" },
+  { key: "proxy", label: "Proxy" },
   { key: "agent", label: "Agents" },
   { key: "review", label: "Reviews" },
   { key: "workflow", label: "Workflows" },

@@ -197,6 +197,57 @@ export const workflowStars = pgTable(
 );
 
 // ============================================
+// PROXY SESSIONS
+// ============================================
+export const proxySessions = pgTable("proxy_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  vaultKeyId: uuid("vault_key_id")
+    .references(() => vaultKeys.id, { onDelete: "cascade" })
+    .notNull(),
+  tokenHash: text("token_hash").unique().notNull(),
+  tokenPrefix: text("token_prefix").notNull(),
+  label: text("label").notNull(),
+  deviceInfo: jsonb("device_info").default({}),
+  isActive: boolean("is_active").default(true).notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  totalRequests: integer("total_requests").default(0).notNull(),
+  totalTokensUsed: integer("total_tokens_used").default(0).notNull(),
+  totalCost: decimal("total_cost", { precision: 10, scale: 4 }).default("0").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// PROXY LOGS
+// ============================================
+export const proxyLogs = pgTable("proxy_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id")
+    .references(() => proxySessions.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  provider: text("provider").notNull(),
+  model: text("model"),
+  endpoint: text("endpoint").notNull(),
+  method: text("method").notNull(),
+  statusCode: integer("status_code").notNull(),
+  inputTokens: integer("input_tokens").default(0).notNull(),
+  outputTokens: integer("output_tokens").default(0).notNull(),
+  totalTokens: integer("total_tokens").default(0).notNull(),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 6 }).default("0").notNull(),
+  latencyMs: integer("latency_ms").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
 // NOTIFICATIONS
 // ============================================
 export const notifications = pgTable("notifications", {

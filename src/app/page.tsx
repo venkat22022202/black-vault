@@ -150,7 +150,7 @@ const features = [
     icon: DollarSign,
     title: "Cost Tracking",
     description:
-      "Real-time spend across OpenAI, Anthropic, Google, and every provider. Budget alerts before you blow through limits.",
+      "Real-time spend per session across OpenAI, Anthropic, and Google AI. Token-level accuracy via the proxy gateway.",
     color: "text-neon-purple",
     glow: "group-hover:shadow-[0_0_30px_rgba(139,92,246,0.15)]",
   },
@@ -166,7 +166,7 @@ const features = [
     icon: Shield,
     title: "Kill Switch",
     description:
-      "Instantly revoke any agent's access. Set permission scopes. Rate limit per agent. Sleep easy.",
+      "Instantly revoke any agent's access via the proxy gateway. Kill sessions in real-time. Sleep easy.",
     color: "text-neon-red",
     glow: "group-hover:shadow-[0_0_30px_rgba(239,68,68,0.15)]",
   },
@@ -233,9 +233,9 @@ export default function LandingPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <span className="inline-flex items-center gap-2 rounded-full border border-void-400 bg-void-100 px-4 py-1.5 text-xs font-medium text-text-secondary">
+            <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-medium text-neon-green">
               <Sparkles className="w-3 h-3 text-neon-green" />
-              The agent era needs a control tower
+              Now in Beta — All features free
             </span>
           </motion.div>
 
@@ -274,7 +274,7 @@ export default function LandingPage() {
               href="/sign-up"
               className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)] animate-pulse-glow"
             >
-              Start Free
+              Join Beta
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a
@@ -422,13 +422,13 @@ export default function LandingPage() {
                 Ready to take control?
               </h2>
               <p className="text-lg text-text-secondary mb-8 max-w-lg mx-auto">
-                Free forever for 3 API keys. No credit card required. Set up in 2 minutes.
+                Free during beta. Unlimited keys. No credit card. Set up in 2 minutes.
               </p>
               <Link
                 href="/sign-up"
                 className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-4 text-lg font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_40px_rgba(0,255,136,0.4)]"
               >
-                Get Started Free
+                Join the Beta
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
@@ -446,12 +446,12 @@ export default function LandingPage() {
             <a href="https://github.com/venkat22022202/black-vault" className="hover:text-text-primary transition-colors">
               GitHub
             </a>
-            <a href="#" className="hover:text-text-primary transition-colors">
-              Docs
-            </a>
-            <a href="#" className="hover:text-text-primary transition-colors">
-              Twitter
-            </a>
+            <Link href="/terms" className="hover:text-text-primary transition-colors">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-text-primary transition-colors">
+              Privacy
+            </Link>
           </div>
         </div>
       </footer>

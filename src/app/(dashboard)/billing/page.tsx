@@ -3,280 +3,148 @@
 import { motion } from "framer-motion";
 import {
   Check,
-  CreditCard,
   Sparkles,
   Zap,
-  Users,
-  Crown,
-  Loader2,
+  Lock,
+  Activity,
+  Shield,
+  Bot,
+  GitFork,
+  Wifi,
+  Gift,
 } from "lucide-react";
-import { useState } from "react";
-import { useSearchParams } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { toast } from "sonner";
+import Link from "next/link";
 
-const plans = [
-  {
-    id: "free",
-    name: "Free",
-    price: 0,
-    priceINR: 0,
-    period: "",
-    description: "For getting started with AI agent management",
-    icon: Zap,
-    color: "text-text-secondary",
-    borderColor: "border-void-300",
-    features: [
-      "3 API keys in vault",
-      "Basic cost dashboard",
-      "Browse agent registry",
-      "Community support",
-    ],
-    cta: "Current Plan",
-    disabled: true,
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    price: 9,
-    priceINR: 749,
-    period: "/mo",
-    description: "For developers running multiple AI agents daily",
-    icon: Crown,
-    color: "text-neon-green",
-    borderColor: "border-neon-green/40",
-    popular: true,
-    features: [
-      "50 API keys in vault",
-      "Advanced cost analytics & charts",
-      "Budget alerts & notifications",
-      "Agent replay (30-day history)",
-      "Unlimited workflow blueprints",
-      "Priority email support",
-    ],
-    cta: "Upgrade to Pro",
-    disabled: false,
-  },
-  {
-    id: "team",
-    name: "Team",
-    price: 29,
-    priceINR: 2499,
-    period: "/seat/mo",
-    description: "For teams building with AI at scale",
-    icon: Users,
-    color: "text-neon-purple",
-    borderColor: "border-neon-purple/40",
-    features: [
-      "Unlimited API keys",
-      "Shared team vaults",
-      "Team cost tracking & budgets",
-      "Role-based access control",
-      "SSO integration",
-      "90-day replay history",
-      "Dedicated Slack support",
-    ],
-    cta: "Upgrade to Team",
-    disabled: false,
-  },
+const betaFeatures = [
+  { icon: Lock, label: "Unlimited vault keys", color: "text-neon-green" },
+  { icon: Wifi, label: "Proxy gateway with SSE streaming", color: "text-neon-cyan" },
+  { icon: Shield, label: "Real-time kill switch", color: "text-neon-red" },
+  { icon: Activity, label: "Live cost tracking per session", color: "text-neon-purple" },
+  { icon: Bot, label: "Agent registry access", color: "text-neon-amber" },
+  { icon: GitFork, label: "Workflow blueprints", color: "text-neon-green" },
 ];
 
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export default function BillingPage() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const searchParams = useSearchParams();
-  const success = searchParams.get("success");
-
-  const handleUpgrade = async (planId: string, amountINR: number) => {
-    setLoading(planId);
-
-    const scriptLoaded = await loadRazorpayScript();
-    if (!scriptLoaded) {
-      toast.error("Failed to load payment gateway");
-      setLoading(null);
-      return;
-    }
-
-    try {
-      const res = await fetch("/api/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: planId, amount: amountINR }),
-      });
-      const data = await res.json();
-
-      if (!data.orderId) {
-        toast.error("Failed to create order");
-        setLoading(null);
-        return;
-      }
-
-      const options = {
-        key: data.keyId,
-        amount: data.amount,
-        currency: data.currency,
-        name: "BlackVault",
-        description: `${planId === "pro" ? "Pro" : "Team"} Plan Subscription`,
-        order_id: data.orderId,
-        handler: () => {
-          toast.success("Payment successful! Your plan has been upgraded.");
-          window.location.href = "/billing?success=true";
-        },
-        prefill: {},
-        theme: {
-          color: "#00FF88",
-          backdrop_color: "#000000",
-        },
-        modal: {
-          ondismiss: () => setLoading(null),
-        },
-      };
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rzp = new ((window as any).Razorpay)(options);
-      rzp.open();
-    } catch {
-      toast.error("Payment initiation failed");
-    } finally {
-      setLoading(null);
-    }
-  };
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
-          <CreditCard className="w-6 h-6 text-neon-green" />
+          <Gift className="w-6 h-6 text-neon-green" />
           Billing & Plans
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          Upgrade to unlock more vault slots, advanced analytics, and team features.
+          You're on the free beta. All features are unlocked.
         </p>
       </div>
 
-      {success && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-lg border border-neon-green/30 bg-neon-green/10 p-4 text-sm text-neon-green flex items-center gap-2"
-        >
-          <Check className="w-5 h-5" />
-          Payment successful! Your plan has been upgraded.
-        </motion.div>
-      )}
+      {/* Beta Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative rounded-2xl border border-neon-green/30 bg-void-50 p-8 overflow-hidden"
+      >
+        <div className="absolute inset-0 bg-neon-green/5" />
+        <div className="absolute top-0 right-0 w-64 h-64 rounded-full bg-neon-green/5 blur-[100px] -translate-y-1/2 translate-x-1/2" />
 
-      {/* Pricing Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {plans.map((plan, i) => (
-          <motion.div
-            key={plan.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, delay: i * 0.1 }}
-            className={cn(
-              "relative rounded-xl border bg-void-50 p-6 flex flex-col",
-              plan.borderColor,
-              plan.popular &&
-                "ring-1 ring-neon-green/30 shadow-[0_0_30px_rgba(0,255,136,0.08)]"
-            )}
-          >
-            {plan.popular && (
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-neon-green px-3 py-1 text-xs font-semibold text-black">
-                  <Sparkles className="w-3 h-3" />
-                  Most Popular
-                </span>
-              </div>
-            )}
-
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <plan.icon className={cn("w-5 h-5", plan.color)} />
-                <span className="text-sm font-semibold text-text-primary">{plan.name}</span>
-              </div>
-              <div className="flex items-baseline gap-1 mb-1">
-                <span className={cn("text-4xl font-bold font-mono", plan.color)}>
-                  ${plan.price}
-                </span>
-                {plan.period && (
-                  <span className="text-sm text-text-muted">{plan.period}</span>
-                )}
-              </div>
-              {plan.priceINR > 0 && (
-                <div className="text-xs text-text-muted">
-                  ~INR {plan.priceINR}{plan.period}
-                </div>
-              )}
-              <p className="text-xs text-text-muted mt-2">{plan.description}</p>
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-12 h-12 rounded-xl bg-neon-green/10 border border-neon-green/20 flex items-center justify-center">
+              <Sparkles className="w-6 h-6 text-neon-green" />
             </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-bold text-text-primary">Beta Access</h2>
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-neon-green/10 text-neon-green border border-neon-green/20">
+                  ACTIVE
+                </span>
+              </div>
+              <p className="text-sm text-text-muted">Everything unlocked. Zero cost.</p>
+            </div>
+          </div>
 
-            <ul className="space-y-3 mb-8 flex-1">
-              {plan.features.map((feature) => (
-                <li key={feature} className="flex items-start gap-2 text-sm text-text-secondary">
-                  <Check className={cn("w-4 h-4 mt-0.5 shrink-0", plan.color)} />
-                  {feature}
-                </li>
-              ))}
-            </ul>
+          <div className="flex items-baseline gap-2 mb-6">
+            <span className="text-5xl font-mono font-bold text-neon-green">$0</span>
+            <span className="text-sm text-text-muted">during beta</span>
+          </div>
 
-            <button
-              onClick={() => !plan.disabled && handleUpgrade(plan.id, plan.priceINR)}
-              disabled={plan.disabled || loading === plan.id}
-              className={cn(
-                "w-full rounded-lg py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2",
-                plan.disabled
-                  ? "bg-void-200 text-text-muted cursor-not-allowed"
-                  : plan.popular
-                  ? "bg-neon-green text-black hover:bg-neon-green/90 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
-                  : "bg-void-200 text-text-primary hover:bg-void-300 border border-void-400"
-              )}
-            >
-              {loading === plan.id ? <Loader2 className="w-4 h-4 animate-spin" /> : plan.cta}
-            </button>
-          </motion.div>
-        ))}
-      </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+            {betaFeatures.map((feature) => (
+              <div key={feature.label} className="flex items-center gap-2.5">
+                <div className="w-6 h-6 rounded-md bg-void-200 flex items-center justify-center">
+                  <feature.icon className={`w-3.5 h-3.5 ${feature.color}`} />
+                </div>
+                <span className="text-sm text-text-secondary">{feature.label}</span>
+              </div>
+            ))}
+          </div>
 
-      {/* Payment Methods Info */}
-      <div className="rounded-xl border border-void-300 bg-void-50 p-6">
-        <h3 className="text-sm font-semibold text-text-primary mb-3">Accepted Payment Methods</h3>
-        <div className="flex flex-wrap gap-3 text-xs text-text-muted">
-          {["Visa", "Mastercard", "Amex", "UPI", "Google Pay", "Net Banking", "Wallets"].map((m) => (
-            <span key={m} className="rounded-full bg-void-200 px-3 py-1.5 border border-void-300">
-              {m}
-            </span>
+          <div className="rounded-lg border border-void-300 bg-void-100 p-4">
+            <div className="flex items-start gap-3">
+              <Zap className="w-5 h-5 text-neon-amber shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-text-primary font-medium">
+                  What happens after beta?
+                </p>
+                <p className="text-xs text-text-muted mt-1 leading-relaxed">
+                  We'll introduce affordable plans with generous free tiers. Your data, keys, and proxy sessions will carry over. Early users get special pricing.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* What's Included */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.1 }}
+        className="rounded-xl border border-void-300 bg-void-50 p-6"
+      >
+        <h3 className="text-sm font-semibold text-text-primary mb-4">
+          Everything included in Beta
+        </h3>
+        <div className="space-y-3">
+          {[
+            "Unlimited API keys in vault",
+            "AES-256-GCM encryption with per-user derived keys",
+            "Proxy gateway for OpenAI, Anthropic, and Google AI",
+            "Full SSE streaming support",
+            "Per-session cost tracking and token counting",
+            "Instant kill switch with session revocation",
+            "Agent registry and community reviews",
+            "Workflow blueprints — create, fork, and share",
+            "Complete activity audit trail",
+          ].map((item) => (
+            <div key={item} className="flex items-center gap-2.5 text-sm text-text-secondary">
+              <Check className="w-4 h-4 text-neon-green shrink-0" />
+              {item}
+            </div>
           ))}
         </div>
-      </div>
+      </motion.div>
 
       {/* FAQ */}
-      <div className="space-y-4 max-w-2xl">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+        className="space-y-4"
+      >
         <h3 className="text-sm font-semibold text-text-primary">FAQ</h3>
         {[
           {
-            q: "What payment methods do you accept?",
-            a: "All major credit/debit cards, UPI, Google Pay, net banking, and popular wallets via Razorpay.",
+            q: "Is the beta really free?",
+            a: "Yes. All features are fully unlocked at zero cost. No credit card, no catch.",
           },
           {
-            q: "Can I cancel anytime?",
-            a: "Yes. You keep access until the end of your billing period. No questions asked.",
+            q: "Will my data be safe after beta ends?",
+            a: "Absolutely. All your encrypted keys, proxy sessions, and activity logs carry over to your account.",
           },
           {
-            q: "What happens to my keys if I downgrade?",
-            a: "Your keys stay encrypted and safe. You can still view/copy them, but can't add new ones beyond the free limit.",
+            q: "How long does the beta last?",
+            a: "We'll announce timelines as we approach launch. You'll get plenty of advance notice.",
           },
         ].map((item) => (
           <div key={item.q} className="rounded-lg border border-void-300 bg-void-50 p-4">
@@ -284,7 +152,23 @@ export default function BillingPage() {
             <div className="text-xs text-text-muted">{item.a}</div>
           </div>
         ))}
-      </div>
+      </motion.div>
+
+      {/* CTA */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+        className="text-center py-4"
+      >
+        <Link
+          href="/vault"
+          className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-6 py-3 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
+        >
+          <Lock className="w-4 h-4" />
+          Go to Vault
+        </Link>
+      </motion.div>
     </div>
   );
 }

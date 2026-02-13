@@ -133,6 +133,26 @@ export const ACTIVITY_TYPES: Record<
     color: "#EF4444",
     icon: "\u{1F6A8}",
   },
+  proxy_token_created: {
+    label: "Proxy Token",
+    color: "#06B6D4",
+    icon: "\u{1F510}",
+  },
+  proxy_session_killed: {
+    label: "Session Killed",
+    color: "#EF4444",
+    icon: "\u{1F6AB}",
+  },
+  proxy_sessions_bulk_killed: {
+    label: "Sessions Purged",
+    color: "#EF4444",
+    icon: "\u{1F4A5}",
+  },
+  proxy_request: {
+    label: "Proxy Request",
+    color: "#8B5CF6",
+    icon: "\u{1F310}",
+  },
   default: {
     label: "Activity",
     color: "#888888",

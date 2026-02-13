@@ -15,6 +15,8 @@ import {
   Calendar,
   Clock,
   AlertTriangle,
+  Wifi,
+  Hash,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -33,7 +35,6 @@ import {
 
 export default function DashboardPage() {
   const { data: keys, isLoading } = trpc.vault.getAll.useQuery();
-  const { data: dbUser } = trpc.user.me.useQuery();
   const { data: dailyCost } = trpc.cost.getDailySummary.useQuery();
   const { data: weeklyCost } = trpc.cost.getWeeklySummary.useQuery();
   const { data: monthlyCost } = trpc.cost.getMonthlySummary.useQuery();
@@ -41,12 +42,13 @@ export default function DashboardPage() {
   const { data: recentActivity } = trpc.activity.getRecent.useQuery({ limit: 5 });
   const { data: killStatus } = trpc.killswitch.getStatus.useQuery();
   const { data: lastSynced } = trpc.cost.getLastSynced.useQuery();
+  const { data: proxyUsage } = trpc.proxy.getKeyUsageSummary.useQuery();
 
   const totalKeys = keys?.length ?? 0;
   const activeKeys = keys?.filter((k) => k.isActive).length ?? 0;
-  const planLabel = dbUser?.plan === "team" ? "Team" : dbUser?.plan === "pro" ? "Pro" : "Free";
+  const planLabel = "Beta";
 
-  const lastSyncedAgo = lastSynced?.lastSynced
+  const lastRequestAgo = lastSynced?.lastSynced
     ? (() => {
         const diff = Date.now() - new Date(lastSynced.lastSynced).getTime();
         if (diff < 60000) return "just now";
@@ -73,19 +75,19 @@ export default function DashboardPage() {
             Your AI agent command center. Everything at a glance.
           </p>
         </div>
-        {lastSyncedAgo && (
+        {lastRequestAgo && (
           <div className="hidden sm:flex items-center gap-1.5 text-xs text-text-muted">
             <Clock className="w-3 h-3" />
-            Last synced: {lastSyncedAgo}
+            Last proxy request: {lastRequestAgo}
           </div>
         )}
       </div>
 
-      {/* Cost Summary Cards */}
+      {/* Proxy Cost Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           {
-            label: "Today",
+            label: "Proxy Cost Today",
             value: dailyCost?.today ?? 0,
             change: dailyCost?.changePercent ?? 0,
             icon: DollarSign,
@@ -208,6 +210,63 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* Proxy Usage Card */}
+      {proxyUsage && proxyUsage.totalSessions > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, delay: 0.35 }}
+          className="rounded-xl border border-neon-cyan/20 bg-void-50 p-5 relative overflow-hidden"
+        >
+          <div className="absolute inset-0 opacity-50 bg-neon-cyan/5" />
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+                <Wifi className="w-4 h-4 text-neon-cyan" />
+                Proxy Gateway
+              </h2>
+              <Link
+                href="/vault"
+                className="text-xs text-neon-cyan hover:underline"
+              >
+                Manage Sessions
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div>
+                <div className="text-xs text-text-muted mb-1">Active Sessions</div>
+                <div className="text-xl font-mono font-bold text-neon-cyan">
+                  {proxyUsage.activeSessions}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-muted mb-1">Total Requests</div>
+                <div className="text-xl font-mono font-bold text-text-primary flex items-center gap-1">
+                  <Hash className="w-3.5 h-3.5 text-text-muted" />
+                  {proxyUsage.totalRequests.toLocaleString()}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-muted mb-1">Tokens Used</div>
+                <div className="text-xl font-mono font-bold text-neon-purple">
+                  {proxyUsage.totalTokens >= 1000000
+                    ? `${(proxyUsage.totalTokens / 1000000).toFixed(1)}M`
+                    : proxyUsage.totalTokens >= 1000
+                      ? `${(proxyUsage.totalTokens / 1000).toFixed(1)}K`
+                      : proxyUsage.totalTokens}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-text-muted mb-1">Proxy Cost</div>
+                <div className="text-xl font-mono font-bold text-neon-green">
+                  ${proxyUsage.totalCost.toFixed(2)}
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Main content area */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Spend by Provider Chart */}
@@ -260,8 +319,8 @@ export default function DashboardPage() {
           ) : (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <DollarSign className="w-8 h-8 text-text-muted mb-2" />
-              <p className="text-sm text-text-muted">No cost data yet</p>
-              <p className="text-xs text-text-muted mt-1">Add API keys to start tracking</p>
+              <p className="text-sm text-text-muted">No proxy usage yet</p>
+              <p className="text-xs text-text-muted mt-1">Generate a proxy token in the Vault to start tracking costs</p>
             </div>
           )}
         </motion.div>

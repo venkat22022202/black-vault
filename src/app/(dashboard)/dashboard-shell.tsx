@@ -8,12 +8,12 @@ import {
   Lock,
   Bot,
   Settings,
-  CreditCard,
+  Gift,
   Menu,
   X,
   GitFork,
   Activity,
-  DollarSign,
+  Sparkles,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -25,7 +25,7 @@ const navItems = [
   { label: "Agents", href: "/agents", icon: Bot },
   { label: "Workflows", href: "/workflows", icon: GitFork },
   { label: "Activity", href: "/activity", icon: Activity },
-  { label: "Billing", href: "/billing", icon: CreditCard },
+  { label: "Billing", href: "/billing", icon: Gift },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -37,12 +37,7 @@ export default function DashboardShell({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: keys } = trpc.vault.getAll.useQuery();
-  const { data: dbUser } = trpc.user.me.useQuery();
-  const { data: costSummary } = trpc.cost.getDailySummary.useQuery();
   const keyCount = keys?.length ?? 0;
-  const plan = dbUser?.plan ?? "free";
-  const maxKeys = plan === "team" ? 999 : plan === "pro" ? 50 : 3;
-  const planLabel = plan === "team" ? "Team" : plan === "pro" ? "Pro" : "Free";
 
   return (
     <div className="min-h-screen bg-void-0">
@@ -55,23 +50,19 @@ export default function DashboardShell({
           >
             {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
-          <Link
-            href="/dashboard"
-            className="font-mono text-lg font-bold tracking-tight text-neon-green"
-          >
-            BLACKVAULT
-          </Link>
+          <div className="flex items-center gap-2.5">
+            <Link
+              href="/dashboard"
+              className="font-mono text-lg font-bold tracking-tight text-neon-green"
+            >
+              BLACKVAULT
+            </Link>
+            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-neon-green/10 text-neon-green border border-neon-green/20">
+              BETA
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-4">
-          {costSummary && costSummary.today > 0 && (
-            <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
-              <DollarSign className="w-3 h-3 text-neon-purple" />
-              <span className="text-neon-purple font-semibold">
-                ${costSummary.today.toFixed(2)}
-              </span>
-              <span className="text-text-muted">today</span>
-            </div>
-          )}
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
             <span className="text-text-muted">Keys:</span>
             <span className="text-neon-green font-semibold">{keyCount}</span>
@@ -116,24 +107,13 @@ export default function DashboardShell({
         </nav>
 
         <div className="absolute bottom-4 left-3 right-3">
-          <div className="rounded-lg border border-void-300 bg-void-100 p-3">
-            <div className="text-xs text-text-muted mb-1">{planLabel} Plan</div>
-            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys === 999 ? "\u221e" : maxKeys} keys used</div>
-            <div className="mt-2 h-1.5 rounded-full bg-void-300 overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  keyCount >= maxKeys ? "bg-neon-amber" : "bg-neon-green"
-                )}
-                style={{ width: `${Math.min((keyCount / maxKeys) * 100, 100)}%` }}
-              />
+          <div className="rounded-lg border border-neon-green/20 bg-neon-green/5 p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Sparkles className="w-3 h-3 text-neon-green" />
+              <span className="text-xs font-semibold text-neon-green">Beta</span>
             </div>
-            <Link
-              href="/billing"
-              className="mt-2 block text-xs text-neon-green hover:underline"
-            >
-              Upgrade to Pro
-            </Link>
+            <div className="text-xs text-text-secondary">All features unlocked</div>
+            <div className="text-xs text-text-muted mt-0.5">{keyCount} keys stored</div>
           </div>
         </div>
       </aside>

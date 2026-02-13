@@ -60,8 +60,8 @@ export default function SettingsPage() {
   const { data: vaultKeys } = trpc.vault.getAll.useQuery();
   const keyCount = vaultKeys?.length ?? 0;
 
-  const planLabel = dbUser?.plan === "team" ? "Team" : dbUser?.plan === "pro" ? "Pro" : "Free";
-  const planColor = dbUser?.plan === "team" ? "text-neon-purple" : dbUser?.plan === "pro" ? "text-neon-green" : "text-text-secondary";
+  const planLabel = "Beta";
+  const planColor = "text-neon-green";
 
   if (isLoading) {
     return (
@@ -196,42 +196,23 @@ export default function SettingsPage() {
                 </span>
               </div>
               <div className="text-xs text-text-muted mt-1">
-                {dbUser?.plan === "free"
-                  ? "3 vault keys, basic features"
-                  : dbUser?.plan === "pro"
-                  ? "50 vault keys, advanced analytics, priority support"
-                  : "Unlimited keys, team vaults, SSO, dedicated support"}
+                All features unlocked during beta. No limits.
               </div>
             </div>
-            <Link
-              href="/billing"
-              className="text-xs text-neon-green hover:underline flex items-center gap-1"
-            >
-              {dbUser?.plan === "free" ? "Upgrade" : "Manage"}
-              <ExternalLink className="w-3 h-3" />
-            </Link>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-neon-green/10 text-neon-green border border-neon-green/20">
+              ACTIVE
+            </span>
           </div>
 
           <div className="border-t border-void-300/50 pt-4">
             <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-text-muted">Vault Keys Used</span>
+              <span className="text-text-muted">Vault Keys Stored</span>
               <span className="font-mono text-text-primary">
-                {keyCount} / {dbUser?.plan === "team" ? "∞" : dbUser?.plan === "pro" ? "50" : "3"}
+                {keyCount} / &infin;
               </span>
             </div>
-            <div className="h-2 rounded-full bg-void-300 overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  keyCount >= 3 && dbUser?.plan === "free" ? "bg-neon-amber" : "bg-neon-green"
-                )}
-                style={{
-                  width: `${Math.min(
-                    (keyCount / (dbUser?.plan === "pro" ? 50 : dbUser?.plan === "team" ? 100 : 3)) * 100,
-                    100
-                  )}%`,
-                }}
-              />
+            <div className="text-xs text-text-muted">
+              No limits during beta
             </div>
           </div>
         </div>

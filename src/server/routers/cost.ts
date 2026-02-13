@@ -1,47 +1,45 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "@/server/trpc/trpc";
 import { db } from "@/server/db";
-import { providerCostSnapshots } from "@/server/db/schema";
-import { eq, and, sql, gte, desc } from "drizzle-orm";
+import { proxyLogs, proxySessions } from "@/server/db/schema";
+import { eq, and, sql, gte } from "drizzle-orm";
 import { cached } from "@/server/services/redis";
-import { syncCostsForUser } from "@/server/services/cost-sync";
 
-function daysAgo(n: number): string {
+function daysAgoDate(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
-  return d.toISOString().slice(0, 10);
+  d.setHours(0, 0, 0, 0);
+  return d;
 }
 
 export const costRouter = router({
   getDailySummary: protectedProcedure.query(async ({ ctx }) => {
-    // Lazily ensure cost data exists
-    await syncCostsForUser(ctx.dbUserId);
-
-    return cached(`cost:daily:${ctx.dbUserId}`, 300, async () => {
-      const today = daysAgo(0);
-      const yesterday = daysAgo(1);
+    return cached(`cost:daily:${ctx.dbUserId}`, 120, async () => {
+      const todayStart = daysAgoDate(0);
+      const yesterdayStart = daysAgoDate(1);
 
       const [todayResult] = await db
         .select({
-          total: sql<number>`coalesce(sum(${providerCostSnapshots.dailyCost}::numeric), 0)`,
+          total: sql<number>`coalesce(sum(${proxyLogs.estimatedCost}::numeric), 0)`,
         })
-        .from(providerCostSnapshots)
+        .from(proxyLogs)
         .where(
           and(
-            eq(providerCostSnapshots.userId, ctx.dbUserId),
-            eq(providerCostSnapshots.date, today)
+            eq(proxyLogs.userId, ctx.dbUserId),
+            gte(proxyLogs.createdAt, todayStart)
           )
         );
 
       const [yesterdayResult] = await db
         .select({
-          total: sql<number>`coalesce(sum(${providerCostSnapshots.dailyCost}::numeric), 0)`,
+          total: sql<number>`coalesce(sum(${proxyLogs.estimatedCost}::numeric), 0)`,
         })
-        .from(providerCostSnapshots)
+        .from(proxyLogs)
         .where(
           and(
-            eq(providerCostSnapshots.userId, ctx.dbUserId),
-            eq(providerCostSnapshots.date, yesterday)
+            eq(proxyLogs.userId, ctx.dbUserId),
+            gte(proxyLogs.createdAt, yesterdayStart),
+            sql`${proxyLogs.createdAt} < ${todayStart}`
           )
         );
 
@@ -61,19 +59,17 @@ export const costRouter = router({
   }),
 
   getWeeklySummary: protectedProcedure.query(async ({ ctx }) => {
-    await syncCostsForUser(ctx.dbUserId);
-
-    return cached(`cost:weekly:${ctx.dbUserId}`, 300, async () => {
-      const weekAgo = daysAgo(7);
+    return cached(`cost:weekly:${ctx.dbUserId}`, 120, async () => {
+      const weekAgo = daysAgoDate(7);
       const [result] = await db
         .select({
-          total: sql<number>`coalesce(sum(${providerCostSnapshots.dailyCost}::numeric), 0)`,
+          total: sql<number>`coalesce(sum(${proxyLogs.estimatedCost}::numeric), 0)`,
         })
-        .from(providerCostSnapshots)
+        .from(proxyLogs)
         .where(
           and(
-            eq(providerCostSnapshots.userId, ctx.dbUserId),
-            gte(providerCostSnapshots.date, weekAgo)
+            eq(proxyLogs.userId, ctx.dbUserId),
+            gte(proxyLogs.createdAt, weekAgo)
           )
         );
 
@@ -82,19 +78,17 @@ export const costRouter = router({
   }),
 
   getMonthlySummary: protectedProcedure.query(async ({ ctx }) => {
-    await syncCostsForUser(ctx.dbUserId);
-
-    return cached(`cost:monthly:${ctx.dbUserId}`, 300, async () => {
-      const monthAgo = daysAgo(30);
+    return cached(`cost:monthly:${ctx.dbUserId}`, 120, async () => {
+      const monthAgo = daysAgoDate(30);
       const [result] = await db
         .select({
-          total: sql<number>`coalesce(sum(${providerCostSnapshots.dailyCost}::numeric), 0)`,
+          total: sql<number>`coalesce(sum(${proxyLogs.estimatedCost}::numeric), 0)`,
         })
-        .from(providerCostSnapshots)
+        .from(proxyLogs)
         .where(
           and(
-            eq(providerCostSnapshots.userId, ctx.dbUserId),
-            gte(providerCostSnapshots.date, monthAgo)
+            eq(proxyLogs.userId, ctx.dbUserId),
+            gte(proxyLogs.createdAt, monthAgo)
           )
         );
 
@@ -105,26 +99,25 @@ export const costRouter = router({
   getByProvider: protectedProcedure
     .input(z.object({ days: z.number().min(1).max(90).default(30) }).optional())
     .query(async ({ ctx, input }) => {
-      await syncCostsForUser(ctx.dbUserId);
       const days = input?.days ?? 30;
 
-      return cached(`cost:provider:${ctx.dbUserId}:${days}`, 300, async () => {
-        const since = daysAgo(days);
+      return cached(`cost:provider:${ctx.dbUserId}:${days}`, 120, async () => {
+        const since = daysAgoDate(days);
         const results = await db
           .select({
-            provider: providerCostSnapshots.provider,
-            total: sql<number>`coalesce(sum(${providerCostSnapshots.dailyCost}::numeric), 0)`,
-            tokens: sql<number>`coalesce(sum(${providerCostSnapshots.tokenCount}), 0)`,
-            requests: sql<number>`coalesce(sum(${providerCostSnapshots.requestCount}), 0)`,
+            provider: proxyLogs.provider,
+            total: sql<number>`coalesce(sum(${proxyLogs.estimatedCost}::numeric), 0)`,
+            tokens: sql<number>`coalesce(sum(${proxyLogs.totalTokens}), 0)`,
+            requests: sql<number>`count(*)`,
           })
-          .from(providerCostSnapshots)
+          .from(proxyLogs)
           .where(
             and(
-              eq(providerCostSnapshots.userId, ctx.dbUserId),
-              gte(providerCostSnapshots.date, since)
+              eq(proxyLogs.userId, ctx.dbUserId),
+              gte(proxyLogs.createdAt, since)
             )
           )
-          .groupBy(providerCostSnapshots.provider);
+          .groupBy(proxyLogs.provider);
 
         const grandTotal = results.reduce((acc, r) => acc + Number(r.total), 0);
 
@@ -140,10 +133,10 @@ export const costRouter = router({
 
   getLastSynced: protectedProcedure.query(async ({ ctx }) => {
     const [latest] = await db
-      .select({ createdAt: providerCostSnapshots.createdAt })
-      .from(providerCostSnapshots)
-      .where(eq(providerCostSnapshots.userId, ctx.dbUserId))
-      .orderBy(desc(providerCostSnapshots.createdAt))
+      .select({ createdAt: proxyLogs.createdAt })
+      .from(proxyLogs)
+      .where(eq(proxyLogs.userId, ctx.dbUserId))
+      .orderBy(sql`${proxyLogs.createdAt} desc`)
       .limit(1);
 
     return { lastSynced: latest?.createdAt ?? null };
