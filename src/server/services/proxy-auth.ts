@@ -6,6 +6,16 @@ import { cached, invalidateCache } from "./redis";
 
 const SESSION_CACHE_TTL = 60; // seconds
 
+/** Convert bytea value (Buffer or Neon hex string) to hex string */
+function toHex(value: Buffer | string): string {
+  if (Buffer.isBuffer(value)) return value.toString("hex");
+  if (typeof value === "string") {
+    // Neon returns bytea as hex string like \x1a2b3c...
+    return value.startsWith("\\x") ? value.slice(2) : value;
+  }
+  return Buffer.from(value as ArrayBuffer).toString("hex");
+}
+
 interface ProxySession {
   id: string;
   userId: string;
@@ -99,8 +109,8 @@ export async function authenticateProxyRequest(
           id: r.keyId,
           userId: r.keyUserId,
           provider: r.keyProvider,
-          encryptedKeyHex: r.keyEncrypted.toString("hex"),
-          ivHex: r.keyIv.toString("hex"),
+          encryptedKeyHex: toHex(r.keyEncrypted),
+          ivHex: toHex(r.keyIv),
           isActive: r.keyIsActive,
         },
       };
