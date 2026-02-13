@@ -11,6 +11,9 @@ import {
   CreditCard,
   Menu,
   X,
+  GitFork,
+  Activity,
+  DollarSign,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -20,6 +23,8 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Vault", href: "/vault", icon: Lock },
   { label: "Agents", href: "/agents", icon: Bot },
+  { label: "Workflows", href: "/workflows", icon: GitFork },
+  { label: "Activity", href: "/activity", icon: Activity },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
@@ -33,6 +38,7 @@ export default function DashboardShell({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: keys } = trpc.vault.getAll.useQuery();
   const { data: dbUser } = trpc.user.me.useQuery();
+  const { data: costSummary } = trpc.cost.getDailySummary.useQuery();
   const keyCount = keys?.length ?? 0;
   const plan = dbUser?.plan ?? "free";
   const maxKeys = plan === "team" ? 999 : plan === "pro" ? 50 : 3;
@@ -57,6 +63,15 @@ export default function DashboardShell({
           </Link>
         </div>
         <div className="flex items-center gap-4">
+          {costSummary && costSummary.today > 0 && (
+            <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
+              <DollarSign className="w-3 h-3 text-neon-purple" />
+              <span className="text-neon-purple font-semibold">
+                ${costSummary.today.toFixed(2)}
+              </span>
+              <span className="text-text-muted">today</span>
+            </div>
+          )}
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
             <span className="text-text-muted">Keys:</span>
             <span className="text-neon-green font-semibold">{keyCount}</span>
@@ -103,7 +118,7 @@ export default function DashboardShell({
         <div className="absolute bottom-4 left-3 right-3">
           <div className="rounded-lg border border-void-300 bg-void-100 p-3">
             <div className="text-xs text-text-muted mb-1">{planLabel} Plan</div>
-            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys === 999 ? "∞" : maxKeys} keys used</div>
+            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys === 999 ? "\u221e" : maxKeys} keys used</div>
             <div className="mt-2 h-1.5 rounded-full bg-void-300 overflow-hidden">
               <div
                 className={cn(

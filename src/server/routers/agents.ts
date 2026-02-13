@@ -4,6 +4,8 @@ import { db } from "@/server/db";
 import { agents, agentVotes } from "@/server/db/schema";
 import { eq, and, ilike, or, sql, desc, asc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { logActivity } from "@/server/services/activity";
+import { checkRateLimit } from "@/server/services/ratelimit";
 
 function slugify(text: string): string {
   return text
@@ -150,6 +152,8 @@ export const agentsRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await checkRateLimit("agentSubmit", ctx.dbUserId);
+
       const slug = slugify(input.name);
 
       // Check slug uniqueness
@@ -187,6 +191,14 @@ export const agentsRouter = router({
           status: "approved", // Auto-approve for MVP
         })
         .returning();
+
+      logActivity(
+        ctx.dbUserId,
+        "agent_submitted",
+        `Submitted agent: ${input.name}`,
+        `New agent "${input.name}" added to the registry`,
+        { agentId: agent.id, category: input.category }
+      );
 
       return agent;
     }),

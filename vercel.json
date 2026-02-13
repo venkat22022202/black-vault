@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/cost-sync",
+      "schedule": "*/15 * * * *"
+    }
+  ]
+}

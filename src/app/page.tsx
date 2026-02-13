@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { trpc } from "@/lib/trpc";
 
 // ============================================
 // ANIMATED TERMINAL
@@ -188,19 +189,10 @@ const features = [
 ];
 
 // ============================================
-// STAT PILLS
-// ============================================
-const stats = [
-  { label: "API Keys Secured", value: "12,847" },
-  { label: "Cost Saved", value: "$284K" },
-  { label: "Agents Tracked", value: "3,291" },
-  { label: "Rogue Agents Killed", value: "847" },
-];
-
-// ============================================
 // PAGE
 // ============================================
 export default function LandingPage() {
+  const { data: publicStats } = trpc.stats.getPublicStats.useQuery();
   return (
     <div className="min-h-screen bg-void-0 overflow-hidden">
       {/* ====== NAV ====== */}
@@ -309,10 +301,15 @@ export default function LandingPage() {
       {/* ====== STATS BAR ====== */}
       <section className="border-y border-void-300 bg-void-50/50">
         <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {stats.map((stat) => (
+          {[
+            { label: "API Keys Secured", value: publicStats?.keys ?? 0 },
+            { label: "Users", value: publicStats?.users ?? 0 },
+            { label: "Agents Registered", value: publicStats?.agents ?? 0 },
+            { label: "Workflows Shared", value: publicStats?.workflows ?? 0 },
+          ].map((stat) => (
             <div key={stat.label} className="text-center">
               <div className="text-2xl md:text-3xl font-mono font-bold text-text-primary">
-                {stat.value}
+                {stat.value.toLocaleString()}
               </div>
               <div className="mt-1 text-sm text-text-muted">{stat.label}</div>
             </div>

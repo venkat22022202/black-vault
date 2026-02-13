@@ -8,6 +8,8 @@ import {
   integer,
   jsonb,
   customType,
+  date,
+  unique,
 } from "drizzle-orm/pg-core";
 
 const bytea = customType<{ data: Buffer }>({
@@ -143,6 +145,56 @@ export const agentVotes = pgTable("agent_votes", {
   vote: integer("vote").notNull(), // 1 or -1
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
+
+// ============================================
+// ACTIVITY LOG
+// ============================================
+export const activityLog = pgTable("activity_log", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: text("type").notNull(), // key_created, key_revealed, key_deleted, key_toggled, agent_submitted, review_submitted, workflow_created, workflow_forked, workflow_starred, killswitch_single, killswitch_all
+  title: text("title").notNull(),
+  description: text("description"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// PROVIDER COST SNAPSHOTS
+// ============================================
+export const providerCostSnapshots = pgTable("provider_cost_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  provider: text("provider").notNull(),
+  date: date("date").notNull(),
+  dailyCost: decimal("daily_cost", { precision: 10, scale: 4 }).notNull(),
+  cumulativeCost: decimal("cumulative_cost", { precision: 10, scale: 4 }).notNull(),
+  tokenCount: integer("token_count").default(0).notNull(),
+  requestCount: integer("request_count").default(0).notNull(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// WORKFLOW STARS
+// ============================================
+export const workflowStars = pgTable(
+  "workflow_stars",
+  {
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    workflowId: uuid("workflow_id")
+      .references(() => workflows.id, { onDelete: "cascade" })
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [unique().on(table.userId, table.workflowId)]
+);
 
 // ============================================
 // NOTIFICATIONS

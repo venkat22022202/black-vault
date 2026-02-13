@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { reviews, agents, users } from "@/server/db/schema";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { logActivity } from "@/server/services/activity";
 
 export const reviewsRouter = router({
   list: publicProcedure
@@ -149,6 +150,14 @@ export const reviewsRouter = router({
           totalReviews: Number(stats.totalReviews),
         })
         .where(eq(agents.id, input.agentId));
+
+      logActivity(
+        ctx.dbUserId,
+        "review_submitted",
+        `Reviewed an agent (${input.rating}/5)`,
+        `Submitted review: "${input.title}"`,
+        { agentId: input.agentId, rating: input.rating }
+      );
 
       return review;
     }),

@@ -13,6 +13,8 @@ import {
   Search,
   Shield,
   Loader2,
+  AlertTriangle,
+  Power,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,7 +23,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 // ============================================
-// ADD KEY MODAL - wired to tRPC
+// ADD KEY MODAL
 // ============================================
 function AddKeyModal({ onClose }: { onClose: () => void }) {
   const [provider, setProvider] = useState<ProviderId>("openai");
@@ -33,6 +35,7 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
   const createKey = trpc.vault.create.useMutation({
     onSuccess: () => {
       utils.vault.getAll.invalidate();
+      utils.killswitch.getStatus.invalidate();
       toast.success("API key encrypted and saved!");
       onClose();
     },
@@ -144,7 +147,92 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
 }
 
 // ============================================
-// KEY CARD - wired to tRPC
+// KILL SWITCH CONFIRMATION MODAL
+// ============================================
+function KillSwitchModal({ onClose, activeCount }: { onClose: () => void; activeCount: number }) {
+  const [confirmText, setConfirmText] = useState("");
+  const utils = trpc.useUtils();
+
+  const revokeAll = trpc.killswitch.revokeAll.useMutation({
+    onSuccess: (data) => {
+      utils.vault.getAll.invalidate();
+      utils.killswitch.getStatus.invalidate();
+      toast.success(`Kill Switch activated! ${data.revokedCount} keys revoked.`);
+      onClose();
+    },
+    onError: () => {
+      toast.error("Failed to activate Kill Switch");
+    },
+  });
+
+  const canConfirm = confirmText === "KILL";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="relative w-full max-w-md rounded-xl border border-neon-red/50 bg-void-50 p-6 shadow-[0_0_40px_rgba(239,68,68,0.15)]"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-neon-red/10 flex items-center justify-center">
+            <AlertTriangle className="w-5 h-5 text-neon-red" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold text-neon-red">Emergency Kill Switch</h2>
+            <p className="text-xs text-text-muted">This action cannot be easily undone</p>
+          </div>
+        </div>
+
+        <div className="rounded-lg bg-neon-red/5 border border-neon-red/20 p-4 mb-4">
+          <p className="text-sm text-text-secondary">
+            This will <span className="text-neon-red font-semibold">immediately disable all {activeCount} active API keys</span> in your vault.
+            Agents using these keys will lose access instantly.
+          </p>
+        </div>
+
+        <div className="mb-4">
+          <label className="block text-xs text-text-muted mb-1.5">
+            Type <span className="text-neon-red font-bold">KILL</span> to confirm
+          </label>
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="KILL"
+            className="w-full rounded-lg border border-neon-red/30 bg-void-200 px-3 py-2.5 text-sm text-text-primary placeholder-text-muted font-mono focus:border-neon-red focus:outline-none focus:ring-1 focus:ring-neon-red/30"
+            autoFocus
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-void-300 px-4 py-2.5 text-sm text-text-secondary hover:bg-void-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => revokeAll.mutate()}
+            disabled={!canConfirm || revokeAll.isPending}
+            className="flex-1 rounded-lg bg-neon-red px-4 py-2.5 text-sm font-semibold text-white hover:bg-neon-red/90 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            {revokeAll.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Power className="w-4 h-4" />
+            )}
+            Revoke All Keys
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+// ============================================
+// KEY CARD
 // ============================================
 interface VaultKeyItem {
   id: string;
@@ -167,7 +255,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
   const revealMutation = trpc.vault.reveal.useMutation({
     onSuccess: (data) => {
       setRevealedKey(data.apiKey);
-      // Auto-hide after 10 seconds
       setTimeout(() => setRevealedKey(null), 10000);
     },
     onError: () => toast.error("Failed to decrypt key"),
@@ -176,6 +263,7 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
   const toggleMutation = trpc.vault.toggleActive.useMutation({
     onSuccess: () => {
       utils.vault.getAll.invalidate();
+      utils.killswitch.getStatus.invalidate();
       toast.success(item.isActive ? "Key disabled" : "Key enabled");
     },
   });
@@ -183,6 +271,7 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
   const deleteMutation = trpc.vault.delete.useMutation({
     onSuccess: () => {
       utils.vault.getAll.invalidate();
+      utils.killswitch.getStatus.invalidate();
       toast.success("Key deleted permanently");
     },
   });
@@ -191,7 +280,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
     if (revealedKey) {
       await navigator.clipboard.writeText(revealedKey);
     } else {
-      // Reveal first, then copy
       const result = await revealMutation.mutateAsync({ id: item.id });
       await navigator.clipboard.writeText(result.apiKey);
     }
@@ -234,7 +322,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
         item.isActive ? "border-void-300" : "border-void-300/50 opacity-60"
       )}
     >
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div
@@ -260,7 +347,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
         </span>
       </div>
 
-      {/* Key display */}
       <div className="flex items-center gap-2 mb-3 p-2.5 rounded-lg bg-void-200 border border-void-300">
         <code className="text-xs font-mono text-text-secondary flex-1 truncate">
           {revealedKey ?? item.keyPrefix}
@@ -287,7 +373,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
         {copied && <span className="text-xs text-neon-green">Copied!</span>}
       </div>
 
-      {/* Meta row */}
       <div className="flex items-center gap-4 text-xs text-text-muted mb-3">
         <span>Last used: {lastUsed}</span>
         {item.monthlyBudget && (
@@ -295,7 +380,6 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
         )}
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-2 pt-2 border-t border-void-300/50">
         <button
           onClick={() => toggleMutation.mutate({ id: item.id })}
@@ -327,19 +411,23 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
 }
 
 // ============================================
-// VAULT PAGE - real data from DB
+// VAULT PAGE
 // ============================================
 export default function VaultPage() {
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showKillSwitch, setShowKillSwitch] = useState(false);
   const [search, setSearch] = useState("");
 
   const { data: keys, isLoading } = trpc.vault.getAll.useQuery();
+  const { data: killStatus } = trpc.killswitch.getStatus.useQuery();
 
   const filteredKeys = (keys ?? []).filter(
     (k) =>
       k.label.toLowerCase().includes(search.toLowerCase()) ||
       k.provider.toLowerCase().includes(search.toLowerCase())
   );
+
+  const activeCount = killStatus?.active ?? 0;
 
   return (
     <div className="space-y-6">
@@ -354,14 +442,37 @@ export default function VaultPage() {
             AES-256-GCM encrypted. Your keys never leave the vault unencrypted.
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          Add Key
-        </button>
+        <div className="flex items-center gap-3">
+          {activeCount > 0 && (
+            <button
+              onClick={() => setShowKillSwitch(true)}
+              className="inline-flex items-center gap-2 rounded-lg border border-neon-red/30 bg-neon-red/5 px-4 py-2.5 text-sm font-semibold text-neon-red hover:bg-neon-red/10 transition-all hover:shadow-[0_0_20px_rgba(239,68,68,0.2)] shrink-0"
+            >
+              <Power className="w-4 h-4" />
+              Kill Switch
+            </button>
+          )}
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)] shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            Add Key
+          </button>
+        </div>
       </div>
+
+      {/* Key Status Bar */}
+      {killStatus && killStatus.total > 0 && (
+        <div className="flex items-center gap-4 rounded-lg border border-void-300 bg-void-50 px-4 py-3 text-xs font-mono">
+          <span className="text-text-muted">Keys:</span>
+          <span className="text-neon-green">{killStatus.active} active</span>
+          <span className="text-text-muted">/</span>
+          <span className="text-neon-red">{killStatus.disabled} disabled</span>
+          <span className="text-text-muted">/</span>
+          <span className="text-text-secondary">{killStatus.total} total</span>
+        </div>
+      )}
 
       {/* Search */}
       <div className="relative">
@@ -415,8 +526,14 @@ export default function VaultPage() {
         </div>
       )}
 
-      {/* Add Key Modal */}
+      {/* Modals */}
       {showAddModal && <AddKeyModal onClose={() => setShowAddModal(false)} />}
+      {showKillSwitch && (
+        <KillSwitchModal
+          onClose={() => setShowKillSwitch(false)}
+          activeCount={activeCount}
+        />
+      )}
     </div>
   );
 }

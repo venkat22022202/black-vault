@@ -6,6 +6,8 @@ import { eq, and } from "drizzle-orm";
 import { encryptApiKey, decryptApiKey } from "@/server/services/encryption";
 import { maskApiKey } from "@/lib/utils";
 import { randomUUID } from "crypto";
+import { logActivity } from "@/server/services/activity";
+import { checkRateLimit } from "@/server/services/ratelimit";
 
 export const vaultRouter = router({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -37,6 +39,8 @@ export const vaultRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      await checkRateLimit("vaultCreate", ctx.dbUserId);
+
       const keyId = randomUUID();
       const { encrypted, iv } = encryptApiKey(
         input.apiKey,
@@ -59,6 +63,14 @@ export const vaultRouter = router({
         })
         .returning();
 
+      logActivity(
+        ctx.dbUserId,
+        "key_created",
+        `Added ${input.provider} key: ${input.label}`,
+        `New API key encrypted and stored`,
+        { keyId: key.id, provider: input.provider }
+      );
+
       return {
         id: key.id,
         provider: key.provider,
@@ -70,6 +82,8 @@ export const vaultRouter = router({
   reveal: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      await checkRateLimit("vaultReveal", ctx.dbUserId);
+
       const [key] = await db
         .select()
         .from(vaultKeys)
@@ -97,6 +111,14 @@ export const vaultRouter = router({
         .update(vaultKeys)
         .set({ lastUsedAt: new Date() })
         .where(eq(vaultKeys.id, input.id));
+
+      logActivity(
+        ctx.dbUserId,
+        "key_revealed",
+        `Revealed key: ${key.label}`,
+        undefined,
+        { keyId: input.id, provider: key.provider }
+      );
 
       return { apiKey: decrypted };
     }),
@@ -128,6 +150,14 @@ export const vaultRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
+      const [key] = await db
+        .select({ label: vaultKeys.label, provider: vaultKeys.provider })
+        .from(vaultKeys)
+        .where(
+          and(eq(vaultKeys.id, input.id), eq(vaultKeys.userId, ctx.dbUserId))
+        )
+        .limit(1);
+
       await db
         .delete(vaultKeys)
         .where(
@@ -136,6 +166,17 @@ export const vaultRouter = router({
             eq(vaultKeys.userId, ctx.dbUserId)
           )
         );
+
+      if (key) {
+        logActivity(
+          ctx.dbUserId,
+          "key_deleted",
+          `Deleted key: ${key.label}`,
+          `Permanently deleted ${key.provider} key`,
+          { provider: key.provider }
+        );
+      }
+
       return { success: true };
     }),
 
@@ -159,6 +200,14 @@ export const vaultRouter = router({
         .update(vaultKeys)
         .set({ isActive: !key.isActive, updatedAt: new Date() })
         .where(eq(vaultKeys.id, input.id));
+
+      logActivity(
+        ctx.dbUserId,
+        "key_toggled",
+        `${key.isActive ? "Disabled" : "Enabled"} a key`,
+        undefined,
+        { keyId: input.id, newState: !key.isActive }
+      );
 
       return { isActive: !key.isActive };
     }),
