@@ -88,12 +88,12 @@ async function handleProxy(
   // Build upstream URL
   const upstreamUrl = `${providerConfig.baseUrl}/${path}`;
 
-  // Build headers: start from client headers, strip auth, add provider auth
-  const headers = new Headers(request.headers);
-  headers.delete("host");
-  headers.delete("content-length"); // Let fetch recompute (body may be modified)
-  for (const h of providerConfig.stripHeaders) {
-    headers.delete(h);
+  // Build headers: only forward safe headers, then add provider auth
+  const FORWARDED_HEADERS = ["content-type", "accept", "user-agent", "anthropic-version"];
+  const headers = new Headers();
+  for (const name of FORWARDED_HEADERS) {
+    const value = request.headers.get(name);
+    if (value) headers.set(name, value);
   }
   const providerHeaders = providerConfig.buildHeaders(realKey);
   for (const [k, v] of Object.entries(providerHeaders)) {
