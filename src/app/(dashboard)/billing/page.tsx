@@ -8,18 +8,19 @@ import {
   Zap,
   Users,
   Crown,
-  ExternalLink,
   Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const plans = [
   {
     id: "free",
     name: "Free",
     price: 0,
+    priceINR: 0,
     period: "",
     description: "For getting started with AI agent management",
     icon: Zap,
@@ -38,6 +39,7 @@ const plans = [
     id: "pro",
     name: "Pro",
     price: 9,
+    priceINR: 749,
     period: "/mo",
     description: "For developers running multiple AI agents daily",
     icon: Crown,
@@ -59,6 +61,7 @@ const plans = [
     id: "team",
     name: "Team",
     price: 29,
+    priceINR: 2499,
     period: "/seat/mo",
     description: "For teams building with AI at scale",
     icon: Users,
@@ -78,47 +81,75 @@ const plans = [
   },
 ];
 
+function loadRazorpayScript(): Promise<boolean> {
+  return new Promise((resolve) => {
+    if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+      resolve(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+}
+
 export default function BillingPage() {
   const [loading, setLoading] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const success = searchParams.get("success");
-  const canceled = searchParams.get("canceled");
 
-  const handleUpgrade = async (planId: string) => {
+  const handleUpgrade = async (planId: string, amountINR: number) => {
     setLoading(planId);
+
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded) {
+      toast.error("Failed to load payment gateway");
+      setLoading(null);
+      return;
+    }
+
     try {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          priceId:
-            planId === "pro"
-              ? process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID
-              : process.env.NEXT_PUBLIC_STRIPE_TEAM_PRICE_ID,
-          plan: planId,
-        }),
+        body: JSON.stringify({ plan: planId, amount: amountINR }),
       });
       const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch {
-      console.error("Checkout failed");
-    } finally {
-      setLoading(null);
-    }
-  };
 
-  const handleManageBilling = async () => {
-    setLoading("portal");
-    try {
-      const res = await fetch("/api/portal", { method: "POST" });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
+      if (!data.orderId) {
+        toast.error("Failed to create order");
+        setLoading(null);
+        return;
       }
+
+      const options = {
+        key: data.keyId,
+        amount: data.amount,
+        currency: data.currency,
+        name: "BlackVault",
+        description: `${planId === "pro" ? "Pro" : "Team"} Plan Subscription`,
+        order_id: data.orderId,
+        handler: () => {
+          toast.success("Payment successful! Your plan has been upgraded.");
+          window.location.href = "/billing?success=true";
+        },
+        prefill: {},
+        theme: {
+          color: "#00FF88",
+          backdrop_color: "#000000",
+        },
+        modal: {
+          ondismiss: () => setLoading(null),
+        },
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rzp = new ((window as any).Razorpay)(options);
+      rzp.open();
     } catch {
-      console.error("Portal redirect failed");
+      toast.error("Payment initiation failed");
     } finally {
       setLoading(null);
     }
@@ -126,7 +157,6 @@ export default function BillingPage() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-text-primary flex items-center gap-2">
           <CreditCard className="w-6 h-6 text-neon-green" />
@@ -137,7 +167,6 @@ export default function BillingPage() {
         </p>
       </div>
 
-      {/* Success / Canceled banners */}
       {success && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -145,16 +174,7 @@ export default function BillingPage() {
           className="rounded-lg border border-neon-green/30 bg-neon-green/10 p-4 text-sm text-neon-green flex items-center gap-2"
         >
           <Check className="w-5 h-5" />
-          Payment successful! Your plan has been upgraded. Welcome to the club.
-        </motion.div>
-      )}
-      {canceled && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-lg border border-neon-amber/30 bg-neon-amber/10 p-4 text-sm text-neon-amber"
-        >
-          Payment was canceled. No charges were made.
+          Payment successful! Your plan has been upgraded.
         </motion.div>
       )}
 
@@ -173,7 +193,6 @@ export default function BillingPage() {
                 "ring-1 ring-neon-green/30 shadow-[0_0_30px_rgba(0,255,136,0.08)]"
             )}
           >
-            {/* Popular badge */}
             {plan.popular && (
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="inline-flex items-center gap-1 rounded-full bg-neon-green px-3 py-1 text-xs font-semibold text-black">
@@ -183,15 +202,12 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* Plan header */}
             <div className="mb-6">
               <div className="flex items-center gap-2 mb-2">
                 <plan.icon className={cn("w-5 h-5", plan.color)} />
-                <span className="text-sm font-semibold text-text-primary">
-                  {plan.name}
-                </span>
+                <span className="text-sm font-semibold text-text-primary">{plan.name}</span>
               </div>
-              <div className="flex items-baseline gap-1 mb-2">
+              <div className="flex items-baseline gap-1 mb-1">
                 <span className={cn("text-4xl font-bold font-mono", plan.color)}>
                   ${plan.price}
                 </span>
@@ -199,25 +215,25 @@ export default function BillingPage() {
                   <span className="text-sm text-text-muted">{plan.period}</span>
                 )}
               </div>
-              <p className="text-xs text-text-muted">{plan.description}</p>
+              {plan.priceINR > 0 && (
+                <div className="text-xs text-text-muted">
+                  ~INR {plan.priceINR}{plan.period}
+                </div>
+              )}
+              <p className="text-xs text-text-muted mt-2">{plan.description}</p>
             </div>
 
-            {/* Features */}
             <ul className="space-y-3 mb-8 flex-1">
               {plan.features.map((feature) => (
-                <li
-                  key={feature}
-                  className="flex items-start gap-2 text-sm text-text-secondary"
-                >
+                <li key={feature} className="flex items-start gap-2 text-sm text-text-secondary">
                   <Check className={cn("w-4 h-4 mt-0.5 shrink-0", plan.color)} />
                   {feature}
                 </li>
               ))}
             </ul>
 
-            {/* CTA */}
             <button
-              onClick={() => !plan.disabled && handleUpgrade(plan.id)}
+              onClick={() => !plan.disabled && handleUpgrade(plan.id, plan.priceINR)}
               disabled={plan.disabled || loading === plan.id}
               className={cn(
                 "w-full rounded-lg py-3 text-sm font-semibold transition-all flex items-center justify-center gap-2",
@@ -228,74 +244,43 @@ export default function BillingPage() {
                   : "bg-void-200 text-text-primary hover:bg-void-300 border border-void-400"
               )}
             >
-              {loading === plan.id ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                plan.cta
-              )}
+              {loading === plan.id ? <Loader2 className="w-4 h-4 animate-spin" /> : plan.cta}
             </button>
           </motion.div>
         ))}
       </div>
 
-      {/* Manage existing subscription */}
+      {/* Payment Methods Info */}
       <div className="rounded-xl border border-void-300 bg-void-50 p-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h3 className="text-sm font-semibold text-text-primary">
-              Manage Subscription
-            </h3>
-            <p className="text-xs text-text-muted mt-1">
-              Update payment method, view invoices, or cancel your plan.
-            </p>
-          </div>
-          <button
-            onClick={handleManageBilling}
-            disabled={loading === "portal"}
-            className="inline-flex items-center gap-2 rounded-lg border border-void-400 bg-void-200 px-4 py-2.5 text-sm text-text-secondary hover:text-text-primary hover:bg-void-300 transition-all shrink-0"
-          >
-            {loading === "portal" ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <>
-                <ExternalLink className="w-4 h-4" />
-                Open Billing Portal
-              </>
-            )}
-          </button>
+        <h3 className="text-sm font-semibold text-text-primary mb-3">Accepted Payment Methods</h3>
+        <div className="flex flex-wrap gap-3 text-xs text-text-muted">
+          {["Visa", "Mastercard", "Amex", "UPI", "Google Pay", "Net Banking", "Wallets"].map((m) => (
+            <span key={m} className="rounded-full bg-void-200 px-3 py-1.5 border border-void-300">
+              {m}
+            </span>
+          ))}
         </div>
       </div>
 
       {/* FAQ */}
       <div className="space-y-4 max-w-2xl">
-        <h3 className="text-sm font-semibold text-text-primary">
-          Frequently Asked Questions
-        </h3>
+        <h3 className="text-sm font-semibold text-text-primary">FAQ</h3>
         {[
           {
             q: "What payment methods do you accept?",
-            a: "We accept all major credit & debit cards (Visa, Mastercard, Amex, Discover), as well as UPI, Google Pay, Apple Pay, and local payment methods depending on your region.",
+            a: "All major credit/debit cards, UPI, Google Pay, net banking, and popular wallets via Razorpay.",
           },
           {
             q: "Can I cancel anytime?",
-            a: "Yes. Cancel from the billing portal anytime. You'll keep Pro/Team access until the end of your current billing period.",
+            a: "Yes. You keep access until the end of your billing period. No questions asked.",
           },
           {
-            q: "What happens to my vault keys if I downgrade?",
-            a: "Your keys stay encrypted and safe. You'll still be able to view and copy them, but won't be able to add new keys beyond the free tier limit.",
-          },
-          {
-            q: "Do you offer annual billing?",
-            a: "Coming soon! Annual plans will offer 2 months free (pay for 10, get 12).",
+            q: "What happens to my keys if I downgrade?",
+            a: "Your keys stay encrypted and safe. You can still view/copy them, but can't add new ones beyond the free limit.",
           },
         ].map((item) => (
-          <div
-            key={item.q}
-            className="rounded-lg border border-void-300 bg-void-50 p-4"
-          >
-            <div className="text-sm font-medium text-text-primary mb-1">
-              {item.q}
-            </div>
+          <div key={item.q} className="rounded-lg border border-void-300 bg-void-50 p-4">
+            <div className="text-sm font-medium text-text-primary mb-1">{item.q}</div>
             <div className="text-xs text-text-muted">{item.a}</div>
           </div>
         ))}

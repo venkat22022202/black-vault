@@ -1,8 +1,8 @@
-import Stripe from "stripe";
+import Razorpay from "razorpay";
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2026-01-28.clover",
-  typescript: true,
+export const razorpay = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID!,
+  key_secret: process.env.RAZORPAY_KEY_SECRET!,
 });
 
 export const PLANS = {
@@ -19,8 +19,8 @@ export const PLANS = {
   },
   pro: {
     name: "Pro",
-    price: 9,
-    priceId: process.env.STRIPE_PRO_PRICE_ID,
+    priceUSD: 9,
+    priceINR: 749,
     maxKeys: 50,
     features: [
       "50 API keys in vault",
@@ -33,8 +33,8 @@ export const PLANS = {
   },
   team: {
     name: "Team",
-    price: 29,
-    priceId: process.env.STRIPE_TEAM_PRICE_ID,
+    priceUSD: 29,
+    priceINR: 2499,
     maxKeys: 999,
     features: [
       "Unlimited API keys",

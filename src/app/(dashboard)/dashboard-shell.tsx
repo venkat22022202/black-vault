@@ -32,8 +32,11 @@ export default function DashboardShell({
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { data: keys } = trpc.vault.getAll.useQuery();
+  const { data: dbUser } = trpc.user.me.useQuery();
   const keyCount = keys?.length ?? 0;
-  const maxKeys = 3; // free plan
+  const plan = dbUser?.plan ?? "free";
+  const maxKeys = plan === "team" ? 999 : plan === "pro" ? 50 : 3;
+  const planLabel = plan === "team" ? "Team" : plan === "pro" ? "Pro" : "Free";
 
   return (
     <div className="min-h-screen bg-void-0">
@@ -55,8 +58,8 @@ export default function DashboardShell({
         </div>
         <div className="flex items-center gap-4">
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
-            <span className="text-text-muted">Today:</span>
-            <span className="text-neon-green font-semibold">$4.23</span>
+            <span className="text-text-muted">Keys:</span>
+            <span className="text-neon-green font-semibold">{keyCount}</span>
           </div>
           <UserButton
             appearance={{
@@ -99,8 +102,8 @@ export default function DashboardShell({
 
         <div className="absolute bottom-4 left-3 right-3">
           <div className="rounded-lg border border-void-300 bg-void-100 p-3">
-            <div className="text-xs text-text-muted mb-1">Free Plan</div>
-            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys} keys used</div>
+            <div className="text-xs text-text-muted mb-1">{planLabel} Plan</div>
+            <div className="text-xs text-text-secondary">{keyCount} / {maxKeys === 999 ? "∞" : maxKeys} keys used</div>
             <div className="mt-2 h-1.5 rounded-full bg-void-300 overflow-hidden">
               <div
                 className={cn(

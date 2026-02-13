@@ -18,9 +18,11 @@ import Link from "next/link";
 
 export default function DashboardPage() {
   const { data: keys, isLoading } = trpc.vault.getAll.useQuery();
+  const { data: dbUser } = trpc.user.me.useQuery();
 
   const totalKeys = keys?.length ?? 0;
   const activeKeys = keys?.filter((k) => k.isActive).length ?? 0;
+  const planLabel = dbUser?.plan === "team" ? "Team" : dbUser?.plan === "pro" ? "Pro" : "Free";
 
   return (
     <div className="space-y-8">
@@ -63,7 +65,7 @@ export default function DashboardPage() {
           },
           {
             label: "Plan",
-            value: "Free",
+            value: planLabel,
             icon: Zap,
             color: "text-neon-amber",
             borderColor: "border-neon-amber/20",
