@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { db } from "@/server/db";
 import { users } from "@/server/db/schema";
 import { eq } from "drizzle-orm";
@@ -15,12 +15,51 @@ export async function createContext(): Promise<Context> {
 
   let dbUserId: string | null = null;
   if (userId) {
-    const user = await db
+    // Try to find existing user in our DB
+    const existing = await db
       .select({ id: users.id })
       .from(users)
       .where(eq(users.clerkId, userId))
       .limit(1);
-    dbUserId = user[0]?.id ?? null;
+
+    if (existing[0]) {
+      dbUserId = existing[0].id;
+    } else {
+      // Auto-sync: create user in our DB on first access
+      const clerkUser = await currentUser();
+      if (clerkUser) {
+        const username =
+          clerkUser.username ??
+          clerkUser.emailAddresses[0]?.emailAddress?.split("@")[0] ??
+          `user-${userId.slice(-8)}`;
+
+        const [newUser] = await db
+          .insert(users)
+          .values({
+            clerkId: userId,
+            username,
+            displayName:
+              [clerkUser.firstName, clerkUser.lastName]
+                .filter(Boolean)
+                .join(" ") || username,
+            avatarUrl: clerkUser.imageUrl,
+          })
+          .onConflictDoNothing()
+          .returning({ id: users.id });
+
+        dbUserId = newUser?.id ?? null;
+
+        // If onConflictDoNothing hit (race condition), fetch again
+        if (!dbUserId) {
+          const retry = await db
+            .select({ id: users.id })
+            .from(users)
+            .where(eq(users.clerkId, userId))
+            .limit(1);
+          dbUserId = retry[0]?.id ?? null;
+        }
+      }
+    }
   }
 
   return { userId, dbUserId };
