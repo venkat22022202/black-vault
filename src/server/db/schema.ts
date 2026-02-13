@@ -1,0 +1,157 @@
+import {
+  pgTable,
+  uuid,
+  text,
+  boolean,
+  timestamp,
+  decimal,
+  integer,
+  jsonb,
+  customType,
+} from "drizzle-orm/pg-core";
+
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return "bytea";
+  },
+});
+
+// ============================================
+// USERS
+// ============================================
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clerkId: text("clerk_id").unique().notNull(),
+  username: text("username").unique().notNull(),
+  displayName: text("display_name"),
+  avatarUrl: text("avatar_url"),
+  bio: text("bio"),
+  githubUrl: text("github_url"),
+  plan: text("plan").default("free").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// API KEY VAULT
+// ============================================
+export const vaultKeys = pgTable("vault_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  provider: text("provider").notNull(),
+  label: text("label").notNull(),
+  encryptedKey: bytea("encrypted_key").notNull(),
+  iv: bytea("iv").notNull(),
+  keyPrefix: text("key_prefix"),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  monthlyBudget: decimal("monthly_budget", { precision: 10, scale: 2 }),
+  isActive: boolean("is_active").default(true).notNull(),
+  permissions: jsonb("permissions").default(["read", "write"]),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// AGENT REGISTRY
+// ============================================
+export const agents = pgTable("agents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  submittedBy: uuid("submitted_by").references(() => users.id),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  description: text("description"),
+  longDescription: text("long_description"),
+  category: text("category"),
+  provider: text("provider"),
+  websiteUrl: text("website_url"),
+  githubUrl: text("github_url"),
+  logoUrl: text("logo_url"),
+  avgCostPerRun: decimal("avg_cost_per_run", { precision: 10, scale: 4 }),
+  permissionsRequired: jsonb("permissions_required"),
+  trustScore: decimal("trust_score", { precision: 3, scale: 2 }).default("0"),
+  totalReviews: integer("total_reviews").default(0).notNull(),
+  totalUpvotes: integer("total_upvotes").default(0).notNull(),
+  isVerified: boolean("is_verified").default(false).notNull(),
+  isFeatured: boolean("is_featured").default(false).notNull(),
+  tags: text("tags").array(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// REVIEWS
+// ============================================
+export const reviews = pgTable("reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agentId: uuid("agent_id")
+    .references(() => agents.id, { onDelete: "cascade" })
+    .notNull(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  rating: integer("rating").notNull(),
+  title: text("title"),
+  body: text("body"),
+  pros: text("pros").array(),
+  cons: text("cons").array(),
+  upvotes: integer("upvotes").default(0).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// WORKFLOWS
+// ============================================
+export const workflows = pgTable("workflows", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  authorId: uuid("author_id")
+    .references(() => users.id)
+    .notNull(),
+  name: text("name").notNull(),
+  slug: text("slug").unique().notNull(),
+  description: text("description"),
+  config: jsonb("config").notNull(),
+  agentsUsed: uuid("agents_used").array(),
+  providersUsed: text("providers_used").array(),
+  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 4 }),
+  totalForks: integer("total_forks").default(0).notNull(),
+  totalStars: integer("total_stars").default(0).notNull(),
+  isPublic: boolean("is_public").default(true).notNull(),
+  version: integer("version").default(1).notNull(),
+  tags: text("tags").array(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// AGENT VOTES
+// ============================================
+export const agentVotes = pgTable("agent_votes", {
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  agentId: uuid("agent_id")
+    .references(() => agents.id, { onDelete: "cascade" })
+    .notNull(),
+  vote: integer("vote").notNull(), // 1 or -1
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .references(() => users.id, { onDelete: "cascade" })
+    .notNull(),
+  type: text("type").notNull(),
+  title: text("title").notNull(),
+  body: text("body"),
+  isRead: boolean("is_read").default(false).notNull(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
