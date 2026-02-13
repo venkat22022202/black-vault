@@ -85,25 +85,6 @@ async function handleProxy(
     );
   }
 
-  // DEBUG: Return key metadata (REMOVE AFTER DEBUGGING)
-  if (request.headers.get("x-debug") === "1") {
-    const keyType = typeof vaultKey.encryptedKey;
-    const isBuffer = Buffer.isBuffer(vaultKey.encryptedKey);
-    const keyLen = vaultKey.encryptedKey?.length;
-    const ivType = typeof vaultKey.iv;
-    const ivIsBuffer = Buffer.isBuffer(vaultKey.iv);
-    let decryptedPreview = "";
-    try {
-      const dk = decryptApiKey(vaultKey.encryptedKey, vaultKey.iv, userId, vaultKey.id);
-      decryptedPreview = `ok, len=${dk.length}, ascii=${/^[\x20-\x7e]+$/.test(dk)}, first5=${dk.slice(0, 5)}`;
-    } catch (e) {
-      decryptedPreview = `fail: ${e instanceof Error ? e.message : String(e)}`;
-    }
-    return NextResponse.json({
-      keyType, isBuffer, keyLen, ivType, ivIsBuffer, decryptedPreview,
-    }, { headers: CORS_HEADERS });
-  }
-
   // Build upstream URL
   const upstreamUrl = `${providerConfig.baseUrl}/${path}`;
 
@@ -262,7 +243,7 @@ async function handleProxy(
   });
  } catch (err) {
     return NextResponse.json(
-      { error: "Internal proxy error", v: 2, details: err instanceof Error ? err.message : String(err), stack: err instanceof Error ? err.stack : undefined },
+      { error: "Internal proxy error", details: err instanceof Error ? err.message : String(err) },
       { status: 500, headers: CORS_HEADERS }
     );
   }
