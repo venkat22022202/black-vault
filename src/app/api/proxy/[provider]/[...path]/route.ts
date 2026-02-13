@@ -27,6 +27,7 @@ async function handleProxy(
   request: NextRequest,
   { params }: { params: Promise<{ provider: string; path: string[] }> }
 ) {
+ try {
   const startTime = Date.now();
   const { provider: providerName, path: pathSegments } = await params;
   const path = pathSegments.join("/");
@@ -240,6 +241,12 @@ async function handleProxy(
     status: statusCode,
     headers: responseHeaders,
   });
+ } catch (err) {
+    return NextResponse.json(
+      { error: "Internal proxy error", details: err instanceof Error ? err.message : String(err) },
+      { status: 500, headers: CORS_HEADERS }
+    );
+  }
 }
 
 // Fire-and-forget logging
