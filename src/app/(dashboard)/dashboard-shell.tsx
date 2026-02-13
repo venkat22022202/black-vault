@@ -8,6 +8,7 @@ import {
   Lock,
   Bot,
   Settings,
+  CreditCard,
   Menu,
   X,
 } from "lucide-react";
@@ -18,6 +19,7 @@ const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Vault", href: "/vault", icon: Lock },
   { label: "Agents", href: "/agents", icon: Bot },
+  { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Settings", href: "/settings", icon: Settings },
 ];
 
