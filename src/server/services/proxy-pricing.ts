@@ -15,6 +15,11 @@ const PRICING: Record<string, [number, number]> = {
   "claude-3-5-sonnet-20241022": [3.0, 15.0],
   "claude-3-haiku-20240307": [0.25, 1.25],
   "claude-3-opus-20240229": [15.0, 75.0],
+  // Nebius (OpenAI-compatible, hosts open-source models)
+  "deepseek-ai/DeepSeek-R1-0528": [0.5, 2.0],
+  "meta-llama/Llama-3.1-70B-Instruct": [0.35, 0.4],
+  "meta-llama/Llama-3.1-8B-Instruct": [0.03, 0.06],
+  "mistralai/Mixtral-8x22B-Instruct-v0.1": [0.65, 0.65],
   // Google
   "gemini-2.0-flash": [0.075, 0.3],
   "gemini-1.5-pro": [1.25, 5.0],

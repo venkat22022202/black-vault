@@ -17,7 +17,7 @@ Agent → BlackVault (bvt_ token) → OpenAI/Anthropic/Google (real key)
 ## Features
 
 - **Encrypted Vault** — AES-256-GCM with per-user derived keys (HKDF). Zero-knowledge at rest.
-- **Proxy Gateway** — Forward requests to OpenAI, Anthropic, Google AI with full SSE streaming support.
+- **Proxy Gateway** — Forward requests to OpenAI, Anthropic, Google AI, Nebius AI with full SSE streaming support.
 - **Instant Kill Switch** — Revoke a session, a key, or everything. Propagates in under 60 seconds via Redis cache invalidation.
 - **Per-Session Cost Tracking** — Token counts and cost estimates per proxy session, per request.
 - **Activity Audit Trail** — Every action logged: key created, session killed, proxy request, etc.

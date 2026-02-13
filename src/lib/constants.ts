@@ -47,6 +47,12 @@ export const PROVIDERS = {
     prefix: "",
     icon: "mic",
   },
+  nebius: {
+    name: "Nebius AI",
+    color: "#5B2EFF",
+    prefix: "",
+    icon: "cloud",
+  },
   other: {
     name: "Other",
     color: "#888888",

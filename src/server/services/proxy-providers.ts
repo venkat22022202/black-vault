@@ -126,8 +126,23 @@ const google: ProviderConfig = {
   stripHeaders: ["x-goog-api-key", "authorization"],
 };
 
+const nebius: ProviderConfig = {
+  baseUrl: "https://api.tokenfactory.nebius.com",
+  buildHeaders(realKey) {
+    return { Authorization: `Bearer ${realKey}` };
+  },
+  extractModel(body) {
+    return (body?.model as string) ?? null;
+  },
+  parseStreamChunk: openai.parseStreamChunk,
+  extractUsage: openai.extractUsage,
+  isStreamDone: openai.isStreamDone,
+  stripHeaders: ["authorization"],
+};
+
 export const PROXY_PROVIDERS: Record<string, ProviderConfig> = {
   openai,
   anthropic,
   google,
+  nebius,
 };
