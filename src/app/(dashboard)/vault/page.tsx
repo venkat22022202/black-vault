@@ -23,12 +23,27 @@ import {
   Hash,
   DollarSign,
   Check,
+  Gauge,
+  Lock,
+  Cpu,
+  Globe,
+  Settings2,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { PROVIDERS, PROVIDER_LIST, type ProviderId } from "@/lib/constants";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+
+// ============================================
+// MODELS BY PROVIDER (for model restriction UI)
+// ============================================
+const MODELS_BY_PROVIDER: Record<string, string[]> = {
+  openai: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4", "gpt-3.5-turbo", "o1", "o1-mini", "o3-mini"],
+  anthropic: ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "claude-3-opus-20240229"],
+  google: ["gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash", "gemini-pro"],
+  nebius: ["deepseek-ai/DeepSeek-R1-0528", "meta-llama/Llama-3.1-70B-Instruct", "meta-llama/Llama-3.1-8B-Instruct", "mistralai/Mixtral-8x22B-Instruct-v0.1"],
+};
 
 // ============================================
 // ADD KEY MODAL
@@ -155,7 +170,7 @@ function AddKeyModal({ onClose }: { onClose: () => void }) {
 }
 
 // ============================================
-// GENERATE PROXY TOKEN MODAL
+// GENERATE PROXY TOKEN MODAL (with rate limits)
 // ============================================
 function GenerateTokenModal({
   onClose,
@@ -171,7 +186,23 @@ function GenerateTokenModal({
   const [generatedToken, setGeneratedToken] = useState<string | null>(null);
   const [proxyBaseUrl, setProxyBaseUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  // Rate limit controls
+  const [rpmEnabled, setRpmEnabled] = useState(false);
+  const [rpm, setRpm] = useState("60");
+  const [rpdEnabled, setRpdEnabled] = useState(false);
+  const [rpd, setRpd] = useState("1000");
+  const [budgetEnabled, setBudgetEnabled] = useState(false);
+  const [budget, setBudget] = useState("10");
+  const [modelRestrictEnabled, setModelRestrictEnabled] = useState(false);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [ipRestrictEnabled, setIpRestrictEnabled] = useState(false);
+  const [ipInput, setIpInput] = useState("");
+  const [allowedIps, setAllowedIps] = useState<string[]>([]);
+
   const utils = trpc.useUtils();
+  const availableModels = MODELS_BY_PROVIDER[provider] ?? [];
 
   const generateToken = trpc.proxy.generateToken.useMutation({
     onSuccess: (data) => {
@@ -206,6 +237,11 @@ function GenerateTokenModal({
       vaultKeyId,
       label: label.trim(),
       expiresInHours,
+      rateLimitRpm: rpmEnabled ? Number(rpm) : undefined,
+      rateLimitRpd: rpdEnabled ? Number(rpd) : undefined,
+      maxBudget: budgetEnabled ? Number(budget) : undefined,
+      allowedModels: modelRestrictEnabled && selectedModels.length > 0 ? selectedModels : undefined,
+      allowedIps: ipRestrictEnabled && allowedIps.length > 0 ? allowedIps : undefined,
     });
   };
 
@@ -217,13 +253,30 @@ function GenerateTokenModal({
     toast.success("Token copied!");
   };
 
+  const addIp = () => {
+    const ip = ipInput.trim();
+    if (!ip) return;
+    if (allowedIps.includes(ip)) {
+      toast.error("IP already added");
+      return;
+    }
+    setAllowedIps([...allowedIps, ip]);
+    setIpInput("");
+  };
+
+  const toggleModel = (model: string) => {
+    setSelectedModels((prev) =>
+      prev.includes(model) ? prev.filter((m) => m !== model) : [...prev, model]
+    );
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="relative w-full max-w-lg rounded-xl border border-neon-cyan/30 bg-void-50 p-6"
+        className="relative w-full max-w-lg rounded-xl border border-neon-cyan/30 bg-void-50 p-6 max-h-[90vh] overflow-y-auto"
       >
         <h2 className="text-lg font-semibold text-text-primary mb-2 flex items-center gap-2">
           <Wifi className="w-5 h-5 text-neon-cyan" />
@@ -265,6 +318,220 @@ function GenerateTokenModal({
                   <option value="never">Never</option>
                 </select>
               </div>
+
+              {/* Advanced Controls Toggle */}
+              <button
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-2 text-xs text-neon-purple hover:text-neon-purple/80 transition-colors w-full py-2 border-t border-void-300/50"
+              >
+                <Settings2 className="w-3.5 h-3.5" />
+                <span className="font-medium">Access Controls & Rate Limits</span>
+                {showAdvanced ? (
+                  <ChevronUp className="w-3.5 h-3.5 ml-auto" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 ml-auto" />
+                )}
+                {(rpmEnabled || rpdEnabled || budgetEnabled || modelRestrictEnabled || ipRestrictEnabled) && (
+                  <span className="ml-1 px-1.5 py-0.5 rounded-full bg-neon-purple/10 text-neon-purple text-[10px] font-bold">
+                    {[rpmEnabled, rpdEnabled, budgetEnabled, modelRestrictEnabled, ipRestrictEnabled].filter(Boolean).length}
+                  </span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {showAdvanced && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    className="overflow-hidden space-y-4"
+                  >
+                    {/* RPM Limit */}
+                    <div className="rounded-lg border border-void-300 bg-void-100 p-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={rpmEnabled}
+                          onChange={(e) => setRpmEnabled(e.target.checked)}
+                          className="accent-neon-cyan"
+                        />
+                        <Gauge className="w-3.5 h-3.5 text-neon-cyan" />
+                        <span className="text-xs font-medium text-text-primary">Requests per Minute (RPM)</span>
+                      </label>
+                      {rpmEnabled && (
+                        <div className="mt-2 ml-6">
+                          <input
+                            type="number"
+                            value={rpm}
+                            onChange={(e) => setRpm(e.target.value)}
+                            min="1"
+                            max="10000"
+                            className="w-full rounded-lg border border-void-300 bg-void-200 px-3 py-2 text-sm text-text-primary font-mono focus:border-neon-cyan focus:outline-none focus:ring-1 focus:ring-neon-cyan/30"
+                          />
+                          <p className="text-[10px] text-text-muted mt-1">Agent gets 429 after this many requests in 60 seconds</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* RPD Limit */}
+                    <div className="rounded-lg border border-void-300 bg-void-100 p-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={rpdEnabled}
+                          onChange={(e) => setRpdEnabled(e.target.checked)}
+                          className="accent-neon-cyan"
+                        />
+                        <Clock className="w-3.5 h-3.5 text-neon-amber" />
+                        <span className="text-xs font-medium text-text-primary">Requests per Day (RPD)</span>
+                      </label>
+                      {rpdEnabled && (
+                        <div className="mt-2 ml-6">
+                          <input
+                            type="number"
+                            value={rpd}
+                            onChange={(e) => setRpd(e.target.value)}
+                            min="1"
+                            max="1000000"
+                            className="w-full rounded-lg border border-void-300 bg-void-200 px-3 py-2 text-sm text-text-primary font-mono focus:border-neon-cyan focus:outline-none focus:ring-1 focus:ring-neon-cyan/30"
+                          />
+                          <p className="text-[10px] text-text-muted mt-1">Hard daily cap - resets every 24 hours</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Budget Limit */}
+                    <div className="rounded-lg border border-void-300 bg-void-100 p-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={budgetEnabled}
+                          onChange={(e) => setBudgetEnabled(e.target.checked)}
+                          className="accent-neon-green"
+                        />
+                        <DollarSign className="w-3.5 h-3.5 text-neon-green" />
+                        <span className="text-xs font-medium text-text-primary">Session Budget Cap</span>
+                      </label>
+                      {budgetEnabled && (
+                        <div className="mt-2 ml-6">
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted">$</span>
+                            <input
+                              type="number"
+                              value={budget}
+                              onChange={(e) => setBudget(e.target.value)}
+                              min="0.01"
+                              step="0.01"
+                              className="w-full rounded-lg border border-void-300 bg-void-200 pl-7 pr-3 py-2 text-sm text-text-primary font-mono focus:border-neon-green focus:outline-none focus:ring-1 focus:ring-neon-green/30"
+                            />
+                          </div>
+                          <p className="text-[10px] text-text-muted mt-1">Agent gets 402 when this budget is exhausted</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Model Restrictions */}
+                    {availableModels.length > 0 && (
+                      <div className="rounded-lg border border-void-300 bg-void-100 p-3">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={modelRestrictEnabled}
+                            onChange={(e) => {
+                              setModelRestrictEnabled(e.target.checked);
+                              if (!e.target.checked) setSelectedModels([]);
+                            }}
+                            className="accent-neon-purple"
+                          />
+                          <Cpu className="w-3.5 h-3.5 text-neon-purple" />
+                          <span className="text-xs font-medium text-text-primary">Model Restrictions</span>
+                        </label>
+                        {modelRestrictEnabled && (
+                          <div className="mt-2 ml-6">
+                            <div className="flex flex-wrap gap-1.5">
+                              {availableModels.map((model) => (
+                                <button
+                                  key={model}
+                                  onClick={() => toggleModel(model)}
+                                  className={cn(
+                                    "px-2 py-1 rounded text-[11px] font-mono border transition-all",
+                                    selectedModels.includes(model)
+                                      ? "bg-neon-purple/10 border-neon-purple/40 text-neon-purple"
+                                      : "bg-void-200 border-void-300 text-text-muted hover:border-void-400"
+                                  )}
+                                >
+                                  {model}
+                                </button>
+                              ))}
+                            </div>
+                            <p className="text-[10px] text-text-muted mt-1.5">
+                              {selectedModels.length === 0
+                                ? "Select models this token can access"
+                                : `${selectedModels.length} model${selectedModels.length !== 1 ? "s" : ""} allowed`}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* IP Allowlist */}
+                    <div className="rounded-lg border border-void-300 bg-void-100 p-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={ipRestrictEnabled}
+                          onChange={(e) => {
+                            setIpRestrictEnabled(e.target.checked);
+                            if (!e.target.checked) setAllowedIps([]);
+                          }}
+                          className="accent-neon-red"
+                        />
+                        <Globe className="w-3.5 h-3.5 text-neon-red" />
+                        <span className="text-xs font-medium text-text-primary">IP Allowlist</span>
+                      </label>
+                      {ipRestrictEnabled && (
+                        <div className="mt-2 ml-6">
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={ipInput}
+                              onChange={(e) => setIpInput(e.target.value)}
+                              onKeyDown={(e) => e.key === "Enter" && addIp()}
+                              placeholder="e.g. 203.0.113.50"
+                              className="flex-1 rounded-lg border border-void-300 bg-void-200 px-3 py-1.5 text-xs text-text-primary font-mono placeholder-text-muted focus:border-neon-red focus:outline-none"
+                            />
+                            <button
+                              onClick={addIp}
+                              className="px-2 py-1.5 rounded-lg bg-void-200 border border-void-300 text-xs text-text-primary hover:bg-void-300 transition-colors"
+                            >
+                              Add
+                            </button>
+                          </div>
+                          {allowedIps.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {allowedIps.map((ip) => (
+                                <span
+                                  key={ip}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-neon-red/10 text-neon-red text-[11px] font-mono"
+                                >
+                                  {ip}
+                                  <button
+                                    onClick={() => setAllowedIps(allowedIps.filter((i) => i !== ip))}
+                                    className="hover:text-white"
+                                  >
+                                    x
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                          <p className="text-[10px] text-text-muted mt-1">Only these IPs can use this proxy token</p>
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
             <div className="flex gap-3 mt-6">
@@ -309,6 +576,43 @@ function GenerateTokenModal({
                 )}
               </button>
             </div>
+
+            {/* Show configured limits summary */}
+            {(rpmEnabled || rpdEnabled || budgetEnabled || modelRestrictEnabled || ipRestrictEnabled) && (
+              <div className="rounded-lg border border-neon-purple/20 bg-neon-purple/5 p-3">
+                <p className="text-xs font-semibold text-neon-purple mb-2 flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />
+                  Access Controls Active
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {rpmEnabled && (
+                    <span className="px-2 py-0.5 rounded bg-neon-cyan/10 text-neon-cyan text-[10px] font-mono">
+                      {rpm} RPM
+                    </span>
+                  )}
+                  {rpdEnabled && (
+                    <span className="px-2 py-0.5 rounded bg-neon-amber/10 text-neon-amber text-[10px] font-mono">
+                      {rpd} RPD
+                    </span>
+                  )}
+                  {budgetEnabled && (
+                    <span className="px-2 py-0.5 rounded bg-neon-green/10 text-neon-green text-[10px] font-mono">
+                      ${budget} budget
+                    </span>
+                  )}
+                  {modelRestrictEnabled && selectedModels.length > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-neon-purple/10 text-neon-purple text-[10px] font-mono">
+                      {selectedModels.length} model{selectedModels.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {ipRestrictEnabled && allowedIps.length > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-neon-red/10 text-neon-red text-[10px] font-mono">
+                      {allowedIps.length} IP{allowedIps.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div>
               <p className="text-xs text-text-muted mb-2">Usage example:</p>
@@ -423,6 +727,32 @@ function KillSwitchModal({ onClose, activeCount }: { onClose: () => void; active
 }
 
 // ============================================
+// BUDGET BAR (visual indicator)
+// ============================================
+function BudgetBar({ spent, limit }: { spent: number; limit: number }) {
+  const pct = Math.min(100, (spent / limit) * 100);
+  const color =
+    pct >= 90 ? "bg-neon-red" : pct >= 70 ? "bg-neon-amber" : "bg-neon-green";
+  const textColor =
+    pct >= 90 ? "text-neon-red" : pct >= 70 ? "text-neon-amber" : "text-neon-green";
+
+  return (
+    <div className="w-full">
+      <div className="flex items-center justify-between text-[10px] mb-0.5">
+        <span className={textColor}>${spent.toFixed(4)}</span>
+        <span className="text-text-muted">${limit.toFixed(2)}</span>
+      </div>
+      <div className="h-1.5 rounded-full bg-void-300 overflow-hidden">
+        <div
+          className={cn("h-full rounded-full transition-all", color)}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // SESSIONS TABLE (per key)
 // ============================================
 function SessionsTable({ vaultKeyId }: { vaultKeyId: string }) {
@@ -505,6 +835,13 @@ function SessionsTable({ vaultKeyId }: { vaultKeyId: string }) {
               })()
             : "Never";
 
+          const hasLimits =
+            session.rateLimitRpm !== null ||
+            session.rateLimitRpd !== null ||
+            session.maxBudget !== null ||
+            (session.allowedModels && session.allowedModels.length > 0) ||
+            (session.allowedIps && session.allowedIps.length > 0);
+
           return (
             <div
               key={session.id}
@@ -524,22 +861,30 @@ function SessionsTable({ vaultKeyId }: { vaultKeyId: string }) {
                     {session.tokenPrefix}
                   </code>
                 </div>
-                <span
-                  className={cn(
-                    "px-1.5 py-0.5 rounded-full text-[10px] font-medium",
-                    status === "active"
-                      ? "bg-neon-green/10 text-neon-green"
-                      : status === "expired"
-                        ? "bg-neon-amber/10 text-neon-amber"
-                        : "bg-neon-red/10 text-neon-red"
+                <div className="flex items-center gap-1.5">
+                  {hasLimits && (
+                    <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-neon-purple/10 text-neon-purple flex items-center gap-0.5">
+                      <Lock className="w-2.5 h-2.5" />
+                      Controls
+                    </span>
                   )}
-                >
-                  {status === "active"
-                    ? "Active"
-                    : status === "expired"
-                      ? "Expired"
-                      : "Killed"}
-                </span>
+                  <span
+                    className={cn(
+                      "px-1.5 py-0.5 rounded-full text-[10px] font-medium",
+                      status === "active"
+                        ? "bg-neon-green/10 text-neon-green"
+                        : status === "expired"
+                          ? "bg-neon-amber/10 text-neon-amber"
+                          : "bg-neon-red/10 text-neon-red"
+                    )}
+                  >
+                    {status === "active"
+                      ? "Active"
+                      : status === "expired"
+                        ? "Expired"
+                        : "Killed"}
+                  </span>
+                </div>
               </div>
 
               <div className="flex items-center gap-4 text-text-muted mb-2">
@@ -559,6 +904,43 @@ function SessionsTable({ vaultKeyId }: { vaultKeyId: string }) {
                   {session.totalTokensUsed.toLocaleString()} tokens
                 </span>
               </div>
+
+              {/* Rate limit & access control indicators */}
+              {hasLimits && status === "active" && (
+                <div className="space-y-1.5 mb-2 pt-2 border-t border-void-300/50">
+                  <div className="flex flex-wrap gap-2">
+                    {session.rateLimitRpm !== null && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neon-cyan/10 text-neon-cyan text-[10px] font-mono">
+                        <Gauge className="w-2.5 h-2.5" />
+                        {session.rateLimitRpm} RPM
+                      </span>
+                    )}
+                    {session.rateLimitRpd !== null && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neon-amber/10 text-neon-amber text-[10px] font-mono">
+                        <Clock className="w-2.5 h-2.5" />
+                        {session.rateLimitRpd} RPD
+                      </span>
+                    )}
+                    {session.allowedModels && session.allowedModels.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neon-purple/10 text-neon-purple text-[10px] font-mono">
+                        <Cpu className="w-2.5 h-2.5" />
+                        {session.allowedModels.length} model{session.allowedModels.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                    {session.allowedIps && session.allowedIps.length > 0 && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-neon-red/10 text-neon-red text-[10px] font-mono">
+                        <Globe className="w-2.5 h-2.5" />
+                        {session.allowedIps.length} IP{session.allowedIps.length !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Budget progress bar */}
+                  {session.maxBudget !== null && (
+                    <BudgetBar spent={session.totalCost} limit={session.maxBudget} />
+                  )}
+                </div>
+              )}
 
               {status === "active" && (
                 <button
@@ -672,7 +1054,7 @@ function KeyCard({ item }: { item: VaultKeyItem }) {
     : "Never";
 
   // Determine if provider is supported for proxying
-  const isProxySupported = ["openai", "anthropic", "google"].includes(
+  const isProxySupported = ["openai", "anthropic", "google", "nebius"].includes(
     item.provider
   );
 
@@ -860,7 +1242,7 @@ export default function VaultPage() {
             API Key Vault
           </h1>
           <p className="text-sm text-text-secondary mt-1">
-            AES-256-GCM encrypted. Your keys never leave the vault unencrypted.
+            AES-256-GCM encrypted. Per-session rate limits, budget caps, model & IP controls.
           </p>
         </div>
         <div className="flex items-center gap-3">

@@ -154,10 +154,25 @@ export const ACTIVITY_TYPES: Record<
     color: "#EF4444",
     icon: "\u{1F4A5}",
   },
+  proxy_session_limits_updated: {
+    label: "Limits Updated",
+    color: "#F59E0B",
+    icon: "\u{1F6E1}",
+  },
   proxy_request: {
     label: "Proxy Request",
     color: "#8B5CF6",
     icon: "\u{1F310}",
+  },
+  rate_limit_hit: {
+    label: "Rate Limited",
+    color: "#F59E0B",
+    icon: "\u{26A0}",
+  },
+  budget_exceeded: {
+    label: "Budget Hit",
+    color: "#EF4444",
+    icon: "\u{1F4B0}",
   },
   default: {
     label: "Activity",

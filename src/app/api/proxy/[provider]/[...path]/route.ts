@@ -1,9 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateProxyRequest, ProxyAuthError } from "@/server/services/proxy-auth";
+import type { SessionLimits } from "@/server/services/proxy-auth";
 import { PROXY_PROVIDERS, type UsageAccumulator } from "@/server/services/proxy-providers";
 import { decryptApiKey } from "@/server/services/encryption";
 import { estimateCost } from "@/server/services/proxy-pricing";
-import { checkProxyRateLimit } from "@/server/services/ratelimit";
+import {
+  checkProxyRateLimit,
+  checkSessionRpmLimit,
+  checkSessionRpdLimit,
+  type RateLimitResult,
+} from "@/server/services/ratelimit";
 import { db } from "@/server/db";
 import { proxyLogs, proxySessions } from "@/server/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -17,6 +23,43 @@ const CORS_HEADERS = {
 };
 
 const REQUEST_TIMEOUT = 5 * 60 * 1000; // 5 minutes
+
+/** Build rate limit headers from a RateLimitResult */
+function rateLimitHeaders(result: RateLimitResult, prefix = "X-RateLimit"): Record<string, string> {
+  return {
+    [`${prefix}-Limit`]: String(result.limit),
+    [`${prefix}-Remaining`]: String(result.remaining),
+    [`${prefix}-Reset`]: String(Math.ceil(result.reset / 1000)),
+  };
+}
+
+/** Build BlackVault metadata headers */
+function blackvaultHeaders(
+  sessionId: string,
+  limits: SessionLimits,
+  cost: number,
+): Record<string, string> {
+  const headers: Record<string, string> = {
+    "X-BlackVault-Session": sessionId,
+    "X-BlackVault-Requests": String(limits.totalRequests),
+    "X-BlackVault-Cost": limits.totalCost.toFixed(6),
+  };
+  if (limits.maxBudget !== null) {
+    const remaining = Math.max(0, limits.maxBudget - limits.totalCost - cost);
+    headers["X-BlackVault-Budget-Limit"] = limits.maxBudget.toFixed(4);
+    headers["X-BlackVault-Budget-Remaining"] = remaining.toFixed(4);
+  }
+  if (limits.rateLimitRpm !== null) {
+    headers["X-BlackVault-RPM-Limit"] = String(limits.rateLimitRpm);
+  }
+  if (limits.rateLimitRpd !== null) {
+    headers["X-BlackVault-RPD-Limit"] = String(limits.rateLimitRpd);
+  }
+  if (limits.allowedModels && limits.allowedModels.length > 0) {
+    headers["X-BlackVault-Allowed-Models"] = limits.allowedModels.join(",");
+  }
+  return headers;
+}
 
 // OPTIONS preflight
 export async function OPTIONS() {
@@ -41,7 +84,7 @@ async function handleProxy(
     );
   }
 
-  // Authenticate
+  // Authenticate (also enforces IP allowlist + budget at auth level)
   let authResult;
   try {
     authResult = await authenticateProxyRequest(request);
@@ -58,18 +101,82 @@ async function handleProxy(
     );
   }
 
-  const { session, vaultKey, userId } = authResult;
+  const { session, vaultKey, userId, limits } = authResult;
+  const allExtraHeaders: Record<string, string> = {};
 
-  // Rate limit per user (200 req/min)
-  const rateCheck = await checkProxyRateLimit(userId);
-  if (!rateCheck.allowed) {
+  // ── Rate Limiting ──────────────────────────────────────
+
+  // 1. Global rate limit (200 req/min per user)
+  const globalRate = await checkProxyRateLimit(userId);
+  Object.assign(allExtraHeaders, rateLimitHeaders(globalRate));
+  if (!globalRate.allowed) {
     return NextResponse.json(
-      { error: "Rate limit exceeded", retryAfter: rateCheck.retryAfter },
-      { status: 429, headers: { ...CORS_HEADERS, "Retry-After": String(rateCheck.retryAfter) } }
+      { error: "Global rate limit exceeded", retryAfter: globalRate.retryAfter },
+      {
+        status: 429,
+        headers: {
+          ...CORS_HEADERS,
+          ...allExtraHeaders,
+          ...blackvaultHeaders(session.id, limits, 0),
+          "Retry-After": String(globalRate.retryAfter),
+        },
+      }
     );
   }
 
-  // Decrypt the real API key
+  // 2. Per-session RPM limit
+  if (limits.rateLimitRpm !== null) {
+    const sessionRpm = await checkSessionRpmLimit(session.id, limits.rateLimitRpm);
+    allExtraHeaders["X-Session-RateLimit-RPM-Limit"] = String(sessionRpm.limit);
+    allExtraHeaders["X-Session-RateLimit-RPM-Remaining"] = String(sessionRpm.remaining);
+    allExtraHeaders["X-Session-RateLimit-RPM-Reset"] = String(Math.ceil(sessionRpm.reset / 1000));
+    if (!sessionRpm.allowed) {
+      return NextResponse.json(
+        {
+          error: "Session rate limit exceeded (RPM)",
+          limit: limits.rateLimitRpm,
+          retryAfter: sessionRpm.retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            ...CORS_HEADERS,
+            ...allExtraHeaders,
+            ...blackvaultHeaders(session.id, limits, 0),
+            "Retry-After": String(sessionRpm.retryAfter),
+          },
+        }
+      );
+    }
+  }
+
+  // 3. Per-session RPD limit
+  if (limits.rateLimitRpd !== null) {
+    const sessionRpd = await checkSessionRpdLimit(session.id, limits.rateLimitRpd);
+    allExtraHeaders["X-Session-RateLimit-RPD-Limit"] = String(sessionRpd.limit);
+    allExtraHeaders["X-Session-RateLimit-RPD-Remaining"] = String(sessionRpd.remaining);
+    if (!sessionRpd.allowed) {
+      return NextResponse.json(
+        {
+          error: "Session daily limit exceeded (RPD)",
+          limit: limits.rateLimitRpd,
+          retryAfter: sessionRpd.retryAfter,
+        },
+        {
+          status: 429,
+          headers: {
+            ...CORS_HEADERS,
+            ...allExtraHeaders,
+            ...blackvaultHeaders(session.id, limits, 0),
+            "Retry-After": String(sessionRpd.retryAfter),
+          },
+        }
+      );
+    }
+  }
+
+  // ── Decrypt the real API key ───────────────────────────
+
   let realKey: string;
   try {
     realKey = decryptApiKey(
@@ -112,6 +219,32 @@ async function handleProxy(
     }
   }
 
+  const model = providerConfig.extractModel(parsedBody, path);
+
+  // ── Model Restriction Enforcement ──────────────────────
+
+  if (limits.allowedModels && limits.allowedModels.length > 0 && model) {
+    const isAllowed = limits.allowedModels.some(
+      (m) => m.toLowerCase() === model.toLowerCase()
+    );
+    if (!isAllowed) {
+      return NextResponse.json(
+        {
+          error: "Model not allowed for this session",
+          requestedModel: model,
+          allowedModels: limits.allowedModels,
+        },
+        {
+          status: 403,
+          headers: {
+            ...CORS_HEADERS,
+            ...blackvaultHeaders(session.id, limits, 0),
+          },
+        }
+      );
+    }
+  }
+
   // For OpenAI streaming, inject stream_options to get usage in final chunk
   if (
     providerName === "openai" &&
@@ -122,7 +255,6 @@ async function handleProxy(
     body = JSON.stringify(parsedBody);
   }
 
-  const model = providerConfig.extractModel(parsedBody, path);
   const isStreaming = parsedBody?.stream === true ||
     path.includes("streamGenerateContent");
 
@@ -150,6 +282,15 @@ async function handleProxy(
   }
 
   const statusCode = upstreamResponse.status;
+
+  // Merge CORS + rate limit + BlackVault headers for all responses
+  const mergedResponseHeaders = (extraHeaders: Record<string, string> = {}) => {
+    const h = new Headers();
+    for (const [k, v] of Object.entries(CORS_HEADERS)) h.set(k, v);
+    for (const [k, v] of Object.entries(allExtraHeaders)) h.set(k, v);
+    for (const [k, v] of Object.entries(extraHeaders)) h.set(k, v);
+    return h;
+  };
 
   if (isStreaming && upstreamResponse.body) {
     // SSE streaming response
@@ -199,12 +340,11 @@ async function handleProxy(
       },
     });
 
-    const responseHeaders = new Headers();
-    responseHeaders.set("Content-Type", upstreamResponse.headers.get("content-type") ?? "text/event-stream");
-    responseHeaders.set("Cache-Control", "no-store");
-    for (const [k, v] of Object.entries(CORS_HEADERS)) {
-      responseHeaders.set(k, v);
-    }
+    const responseHeaders = mergedResponseHeaders({
+      "Content-Type": upstreamResponse.headers.get("content-type") ?? "text/event-stream",
+      "Cache-Control": "no-store",
+      ...blackvaultHeaders(session.id, limits, 0),
+    });
 
     return new Response(stream, {
       status: statusCode,
@@ -230,12 +370,11 @@ async function handleProxy(
   logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, statusCode, usage.input, usage.output, totalTokens, latencyMs, request);
   updateSessionCounters(session.id, totalTokens, cost);
 
-  const responseHeaders = new Headers();
-  responseHeaders.set("Content-Type", upstreamResponse.headers.get("content-type") ?? "application/json");
-  responseHeaders.set("Cache-Control", "no-store");
-  for (const [k, v] of Object.entries(CORS_HEADERS)) {
-    responseHeaders.set(k, v);
-  }
+  const responseHeaders = mergedResponseHeaders({
+    "Content-Type": upstreamResponse.headers.get("content-type") ?? "application/json",
+    "Cache-Control": "no-store",
+    ...blackvaultHeaders(session.id, limits, cost),
+  });
 
   return new Response(responseBody, {
     status: statusCode,

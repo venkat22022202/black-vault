@@ -33,6 +33,19 @@ function getLimiter(key: string, requests: number, window: string): Ratelimit | 
   return limiters[key];
 }
 
+/**
+ * Create a dynamic limiter (not cached in the limiters map) for per-session limits.
+ */
+function createDynamicLimiter(prefix: string, requests: number, window: string): Ratelimit | null {
+  const redis = getRedis();
+  if (!redis) return null;
+  return new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"s" | "m" | "h" | "d"}`),
+    prefix,
+  });
+}
+
 const LIMITS = {
   vaultReveal: { requests: 5, window: "1 m" },
   vaultCreate: { requests: 10, window: "1 m" },
@@ -57,20 +70,95 @@ export async function checkRateLimit(
   }
 }
 
+export interface RateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  reset: number; // epoch ms
+  retryAfter?: number; // seconds
+}
+
 /**
- * Proxy-specific rate limit check (non-tRPC, returns boolean).
- * Returns { allowed: true } or { allowed: false, retryAfter: seconds }.
+ * Global proxy rate limit check (200 req/min per user).
  */
 export async function checkProxyRateLimit(
   userId: string
-): Promise<{ allowed: true } | { allowed: false; retryAfter: number }> {
+): Promise<RateLimitResult> {
   const config = LIMITS.proxyRequest;
   const limiter = getLimiter("proxyRequest", config.requests, config.window);
-  if (!limiter) return { allowed: true };
+  if (!limiter) return { allowed: true, limit: config.requests, remaining: config.requests, reset: Date.now() + 60000 };
 
   const result = await limiter.limit(userId);
   if (!result.success) {
-    return { allowed: false, retryAfter: Math.ceil((result.reset - Date.now()) / 1000) };
+    return {
+      allowed: false,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
+    };
   }
-  return { allowed: true };
+  return {
+    allowed: true,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  };
+}
+
+/**
+ * Per-session rate limit: requests per minute.
+ * Uses a dynamic limiter keyed by session ID.
+ */
+export async function checkSessionRpmLimit(
+  sessionId: string,
+  rpm: number
+): Promise<RateLimitResult> {
+  const limiter = createDynamicLimiter(`bv:sess:rpm:${rpm}`, rpm, "1 m");
+  if (!limiter) return { allowed: true, limit: rpm, remaining: rpm, reset: Date.now() + 60000 };
+
+  const result = await limiter.limit(sessionId);
+  if (!result.success) {
+    return {
+      allowed: false,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
+    };
+  }
+  return {
+    allowed: true,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  };
+}
+
+/**
+ * Per-session rate limit: requests per day.
+ */
+export async function checkSessionRpdLimit(
+  sessionId: string,
+  rpd: number
+): Promise<RateLimitResult> {
+  const limiter = createDynamicLimiter(`bv:sess:rpd:${rpd}`, rpd, "1 d");
+  if (!limiter) return { allowed: true, limit: rpd, remaining: rpd, reset: Date.now() + 86400000 };
+
+  const result = await limiter.limit(sessionId);
+  if (!result.success) {
+    return {
+      allowed: false,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
+    };
+  }
+  return {
+    allowed: true,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  };
 }

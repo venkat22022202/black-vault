@@ -14,6 +14,15 @@ export const proxyRouter = router({
         vaultKeyId: z.string().uuid(),
         label: z.string().min(1).max(100),
         expiresInHours: z.number().positive().optional(),
+        // Rate limit controls
+        rateLimitRpm: z.number().int().min(1).max(10000).optional(),
+        rateLimitRpd: z.number().int().min(1).max(1000000).optional(),
+        maxBudget: z.number().min(0.01).max(100000).optional(),
+        allowedModels: z.array(z.string().min(1).max(100)).max(50).optional(),
+        allowedIps: z
+          .array(z.string().min(7).max(45)) // IPv4 min "1.1.1.1", IPv6 max 45 chars
+          .max(50)
+          .optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -50,14 +59,34 @@ export const proxyRouter = router({
         tokenPrefix: prefix,
         label: input.label,
         expiresAt,
+        rateLimitRpm: input.rateLimitRpm ?? null,
+        rateLimitRpd: input.rateLimitRpd ?? null,
+        maxBudget: input.maxBudget?.toFixed(4) ?? null,
+        allowedModels: input.allowedModels?.length ? input.allowedModels : null,
+        allowedIps: input.allowedIps?.length ? input.allowedIps : null,
       });
+
+      const limitParts: string[] = [];
+      if (input.rateLimitRpm) limitParts.push(`${input.rateLimitRpm} RPM`);
+      if (input.rateLimitRpd) limitParts.push(`${input.rateLimitRpd} RPD`);
+      if (input.maxBudget) limitParts.push(`$${input.maxBudget} budget`);
+      if (input.allowedModels?.length) limitParts.push(`${input.allowedModels.length} models`);
+      if (input.allowedIps?.length) limitParts.push(`${input.allowedIps.length} IPs`);
 
       logActivity(
         ctx.dbUserId,
         "proxy_token_created",
         `Created proxy token: ${input.label}`,
-        `New proxy session for ${key.provider} key "${key.label}"`,
-        { vaultKeyId: input.vaultKeyId, provider: key.provider }
+        `New proxy session for ${key.provider} key "${key.label}"${limitParts.length ? ` [${limitParts.join(", ")}]` : ""}`,
+        {
+          vaultKeyId: input.vaultKeyId,
+          provider: key.provider,
+          rateLimitRpm: input.rateLimitRpm,
+          rateLimitRpd: input.rateLimitRpd,
+          maxBudget: input.maxBudget,
+          allowedModels: input.allowedModels,
+          allowedIps: input.allowedIps,
+        }
       );
 
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -67,6 +96,64 @@ export const proxyRouter = router({
         prefix,
         proxyBaseUrl: `${appUrl}/api/proxy/${key.provider}`,
       };
+    }),
+
+  updateSessionLimits: protectedProcedure
+    .input(
+      z.object({
+        sessionId: z.string().uuid(),
+        rateLimitRpm: z.number().int().min(1).max(10000).nullable().optional(),
+        rateLimitRpd: z.number().int().min(1).max(1000000).nullable().optional(),
+        maxBudget: z.number().min(0.01).max(100000).nullable().optional(),
+        allowedModels: z.array(z.string().min(1).max(100)).max(50).nullable().optional(),
+        allowedIps: z.array(z.string().min(7).max(45)).max(50).nullable().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const [session] = await db
+        .select({
+          id: proxySessions.id,
+          tokenHash: proxySessions.tokenHash,
+          label: proxySessions.label,
+        })
+        .from(proxySessions)
+        .where(
+          and(
+            eq(proxySessions.id, input.sessionId),
+            eq(proxySessions.userId, ctx.dbUserId)
+          )
+        )
+        .limit(1);
+
+      if (!session) throw new Error("Session not found");
+
+      const updates: Record<string, unknown> = { updatedAt: new Date() };
+      if (input.rateLimitRpm !== undefined) updates.rateLimitRpm = input.rateLimitRpm;
+      if (input.rateLimitRpd !== undefined) updates.rateLimitRpd = input.rateLimitRpd;
+      if (input.maxBudget !== undefined)
+        updates.maxBudget = input.maxBudget?.toFixed(4) ?? null;
+      if (input.allowedModels !== undefined)
+        updates.allowedModels = input.allowedModels?.length ? input.allowedModels : null;
+      if (input.allowedIps !== undefined)
+        updates.allowedIps = input.allowedIps?.length ? input.allowedIps : null;
+
+      await db
+        .update(proxySessions)
+        .set(updates)
+        .where(eq(proxySessions.id, input.sessionId));
+
+      // Invalidate cache so new limits take effect immediately
+      await invalidateProxySession(session.tokenHash);
+
+      logActivity(
+        ctx.dbUserId,
+        "proxy_session_limits_updated",
+        `Updated limits for session: ${session.label}`,
+        undefined,
+        { sessionId: input.sessionId, ...updates }
+      );
+
+      return { success: true };
     }),
 
   listSessions: protectedProcedure
@@ -96,6 +183,11 @@ export const proxyRouter = router({
           totalRequests: proxySessions.totalRequests,
           totalTokensUsed: proxySessions.totalTokensUsed,
           totalCost: proxySessions.totalCost,
+          rateLimitRpm: proxySessions.rateLimitRpm,
+          rateLimitRpd: proxySessions.rateLimitRpd,
+          maxBudget: proxySessions.maxBudget,
+          allowedModels: proxySessions.allowedModels,
+          allowedIps: proxySessions.allowedIps,
           createdAt: proxySessions.createdAt,
           keyProvider: vaultKeys.provider,
           keyLabel: vaultKeys.label,
@@ -108,6 +200,9 @@ export const proxyRouter = router({
       return sessions.map((s) => ({
         ...s,
         totalCost: Number(s.totalCost),
+        maxBudget: s.maxBudget ? Number(s.maxBudget) : null,
+        allowedModels: (s.allowedModels as string[] | null) ?? null,
+        allowedIps: (s.allowedIps as string[] | null) ?? null,
         isExpired: s.expiresAt ? new Date(s.expiresAt) < new Date() : false,
       }));
     }),

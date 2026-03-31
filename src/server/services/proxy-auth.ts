@@ -25,6 +25,16 @@ interface ProxySession {
   expiresAt: Date | null;
 }
 
+export interface SessionLimits {
+  rateLimitRpm: number | null;
+  rateLimitRpd: number | null;
+  maxBudget: number | null;
+  allowedModels: string[] | null;
+  allowedIps: string[] | null;
+  totalCost: number;
+  totalRequests: number;
+}
+
 export interface VaultKey {
   id: string;
   userId: string;
@@ -32,6 +42,7 @@ export interface VaultKey {
   encryptedKey: Buffer;
   iv: Buffer;
   isActive: boolean;
+  monthlyBudget: number | null;
 }
 
 // Cached version stores hex strings instead of Buffers
@@ -43,17 +54,20 @@ interface CachedVaultKey {
   encryptedKeyHex: string;
   ivHex: string;
   isActive: boolean;
+  monthlyBudget: number | null;
 }
 
 interface CachedSessionData {
   session: ProxySession;
   vaultKey: CachedVaultKey;
+  limits: SessionLimits;
 }
 
 export interface AuthResult {
   session: ProxySession;
   vaultKey: VaultKey;
   userId: string;
+  limits: SessionLimits;
 }
 
 export async function authenticateProxyRequest(
@@ -81,12 +95,20 @@ export async function authenticateProxyRequest(
           sessionTokenHash: proxySessions.tokenHash,
           sessionIsActive: proxySessions.isActive,
           sessionExpiresAt: proxySessions.expiresAt,
+          sessionRateLimitRpm: proxySessions.rateLimitRpm,
+          sessionRateLimitRpd: proxySessions.rateLimitRpd,
+          sessionMaxBudget: proxySessions.maxBudget,
+          sessionAllowedModels: proxySessions.allowedModels,
+          sessionAllowedIps: proxySessions.allowedIps,
+          sessionTotalCost: proxySessions.totalCost,
+          sessionTotalRequests: proxySessions.totalRequests,
           keyId: vaultKeys.id,
           keyUserId: vaultKeys.userId,
           keyProvider: vaultKeys.provider,
           keyEncrypted: vaultKeys.encryptedKey,
           keyIv: vaultKeys.iv,
           keyIsActive: vaultKeys.isActive,
+          keyMonthlyBudget: vaultKeys.monthlyBudget,
         })
         .from(proxySessions)
         .innerJoin(vaultKeys, eq(proxySessions.vaultKeyId, vaultKeys.id))
@@ -112,6 +134,16 @@ export async function authenticateProxyRequest(
           encryptedKeyHex: toHex(r.keyEncrypted),
           ivHex: toHex(r.keyIv),
           isActive: r.keyIsActive,
+          monthlyBudget: r.keyMonthlyBudget ? Number(r.keyMonthlyBudget) : null,
+        },
+        limits: {
+          rateLimitRpm: r.sessionRateLimitRpm,
+          rateLimitRpd: r.sessionRateLimitRpd,
+          maxBudget: r.sessionMaxBudget ? Number(r.sessionMaxBudget) : null,
+          allowedModels: r.sessionAllowedModels as string[] | null,
+          allowedIps: r.sessionAllowedIps as string[] | null,
+          totalCost: Number(r.sessionTotalCost),
+          totalRequests: Number(r.sessionTotalRequests),
         },
       };
     }
@@ -121,7 +153,7 @@ export async function authenticateProxyRequest(
     throw new ProxyAuthError(401, "Invalid proxy token");
   }
 
-  const { session } = cachedData;
+  const { session, limits } = cachedData;
   // Re-hydrate Buffers from hex strings (safe across JSON/Redis round-trips)
   const vaultKey: VaultKey = {
     id: cachedData.vaultKey.id,
@@ -130,6 +162,7 @@ export async function authenticateProxyRequest(
     encryptedKey: Buffer.from(cachedData.vaultKey.encryptedKeyHex, "hex"),
     iv: Buffer.from(cachedData.vaultKey.ivHex, "hex"),
     isActive: cachedData.vaultKey.isActive,
+    monthlyBudget: cachedData.vaultKey.monthlyBudget,
   };
 
   if (!session.isActive) {
@@ -142,6 +175,25 @@ export async function authenticateProxyRequest(
 
   if (!vaultKey.isActive) {
     throw new ProxyAuthError(403, "Underlying API key has been disabled");
+  }
+
+  // IP allowlist enforcement
+  if (limits.allowedIps && limits.allowedIps.length > 0) {
+    const clientIp =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+      request.headers.get("x-real-ip") ??
+      null;
+    if (clientIp && !limits.allowedIps.includes(clientIp)) {
+      throw new ProxyAuthError(403, "IP address not in allowlist for this session");
+    }
+  }
+
+  // Budget enforcement: session-level
+  if (limits.maxBudget !== null && limits.totalCost >= limits.maxBudget) {
+    throw new ProxyAuthError(
+      402,
+      `Session budget exhausted ($${limits.totalCost.toFixed(4)} / $${limits.maxBudget.toFixed(4)})`
+    );
   }
 
   // Fire-and-forget: update lastUsedAt + deviceInfo
@@ -161,7 +213,7 @@ export async function authenticateProxyRequest(
     .then(() => {})
     .catch(() => {});
 
-  return { session, vaultKey, userId: session.userId };
+  return { session, vaultKey, userId: session.userId, limits };
 }
 
 export async function invalidateProxySession(tokenHash: string) {
