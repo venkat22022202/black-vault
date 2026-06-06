@@ -6,24 +6,25 @@ import { UserButton } from "@clerk/nextjs";
 import {
   LayoutDashboard,
   Lock,
-  Bot,
+  ShieldCheck,
   Settings,
   Gift,
   Menu,
   X,
-  GitFork,
   Activity,
   Sparkles,
+  Star,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 
+const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
+
 const navItems = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Vault", href: "/vault", icon: Lock },
-  { label: "Agents", href: "/agents", icon: Bot },
-  { label: "Workflows", href: "/workflows", icon: GitFork },
+  { label: "Firewall", href: "/firewall", icon: ShieldCheck },
   { label: "Activity", href: "/activity", icon: Activity },
   { label: "Billing", href: "/billing", icon: Gift },
   { label: "Settings", href: "/settings", icon: Settings },
@@ -62,7 +63,16 @@ export default function DashboardShell({
             </span>
           </div>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <a
+            href={GITHUB_REPO}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-neon-green hover:border-neon-green/40 transition-colors"
+          >
+            <Star className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Star on GitHub</span>
+          </a>
           <div className="hidden sm:flex items-center gap-2 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-mono">
             <span className="text-text-muted">Keys:</span>
             <span className="text-neon-green font-semibold">{keyCount}</span>

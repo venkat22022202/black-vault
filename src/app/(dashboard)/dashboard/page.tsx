@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   Wifi,
   Hash,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -537,16 +538,16 @@ export default function DashboardPage() {
             description: "Encrypt and store a provider key",
           },
           {
-            label: "Browse Agents",
-            href: "/agents",
-            icon: Activity,
-            description: "Discover community AI agents",
+            label: "Egress Firewall",
+            href: "/firewall",
+            icon: ShieldCheck,
+            description: "Broker a credential to an agent",
           },
           {
-            label: "Explore Workflows",
-            href: "/workflows",
-            icon: ArrowUpRight,
-            description: "Fork and share agent workflows",
+            label: "View Activity",
+            href: "/activity",
+            icon: Activity,
+            description: "Audit every key, token, and call",
           },
         ].map((action) => (
           <Link
