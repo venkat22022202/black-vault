@@ -33,7 +33,7 @@ export default function BillingPage() {
           Billing & Plans
         </h1>
         <p className="text-sm text-text-secondary mt-1">
-          You're on the free beta. All features are unlocked.
+          You&apos;re on the free beta. All features are unlocked.
         </p>
       </div>
 
@@ -87,7 +87,7 @@ export default function BillingPage() {
                   What happens after beta?
                 </p>
                 <p className="text-xs text-text-muted mt-1 leading-relaxed">
-                  We'll introduce affordable plans with generous free tiers. Your data, keys, and proxy sessions will carry over. Early users get special pricing.
+                  We&apos;ll introduce affordable plans with generous free tiers. Your data, keys, and proxy sessions will carry over. Early users get special pricing.
                 </p>
               </div>
             </div>

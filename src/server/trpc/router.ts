@@ -9,6 +9,7 @@ import { killswitchRouter } from "@/server/routers/killswitch";
 import { workflowsRouter } from "@/server/routers/workflows";
 import { statsRouter } from "@/server/routers/stats";
 import { proxyRouter } from "@/server/routers/proxy";
+import { egressRouter } from "@/server/routers/egress";
 
 export const appRouter = router({
   vault: vaultRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   workflows: workflowsRouter,
   stats: statsRouter,
   proxy: proxyRouter,
+  egress: egressRouter,
 });
 
 export type AppRouter = typeof appRouter;

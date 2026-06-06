@@ -3,7 +3,12 @@ import { authenticateProxyRequest, ProxyAuthError } from "@/server/services/prox
 import type { SessionLimits } from "@/server/services/proxy-auth";
 import { PROXY_PROVIDERS, type UsageAccumulator } from "@/server/services/proxy-providers";
 import { decryptApiKey } from "@/server/services/encryption";
-import { estimateCost } from "@/server/services/proxy-pricing";
+import {
+  estimateCost,
+  estimateRequestCost,
+  extractMaxOutputTokens,
+} from "@/server/services/proxy-pricing";
+import { reserveBudget, commitSpend } from "@/server/services/budget";
 import {
   checkProxyRateLimit,
   checkSessionRpmLimit,
@@ -258,6 +263,40 @@ async function handleProxy(
   const isStreaming = parsedBody?.stream === true ||
     path.includes("streamGenerateContent");
 
+  // ── Budget reservation (atomic, real-time) ─────────────
+  // Reserve a conservative estimate before forwarding so concurrent requests
+  // can't all read a stale spend total and blow past the cap. Reconciled to the
+  // actual cost after the response in commitSpend().
+  const estimatedCost = estimateRequestCost(
+    providerName,
+    model,
+    body ?? "",
+    extractMaxOutputTokens(parsedBody)
+  );
+  const reservation = await reserveBudget(
+    session.id,
+    limits.maxBudget,
+    limits.totalCost,
+    estimatedCost
+  );
+  if (!reservation.allowed) {
+    return NextResponse.json(
+      {
+        error: "Session budget exhausted",
+        limit: limits.maxBudget,
+        spent: Number(reservation.spentBefore.toFixed(6)),
+      },
+      {
+        status: 402,
+        headers: {
+          ...CORS_HEADERS,
+          ...allExtraHeaders,
+          ...blackvaultHeaders(session.id, limits, 0),
+        },
+      }
+    );
+  }
+
   // Forward request to provider
   let upstreamResponse: Response;
   try {
@@ -274,6 +313,8 @@ async function handleProxy(
     clearTimeout(timeout);
   } catch (err) {
     const latencyMs = Date.now() - startTime;
+    // Refund the reservation — no cost was incurred.
+    commitSpend(session.id, reservation.reserved, 0);
     logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, 502, 0, 0, 0, latencyMs, request);
     return NextResponse.json(
       { error: "Failed to reach provider", details: err instanceof Error ? err.message : "Unknown error" },
@@ -316,6 +357,7 @@ async function handleProxy(
             const latencyMs = Date.now() - startTime;
             const totalTokens = acc.input + acc.output;
             const cost = estimateCost(providerName, model, acc.input, acc.output);
+            commitSpend(session.id, reservation.reserved, cost);
             logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, statusCode, acc.input, acc.output, totalTokens, latencyMs, request);
             updateSessionCounters(session.id, totalTokens, cost);
             return;
@@ -367,6 +409,7 @@ async function handleProxy(
   const totalTokens = usage.input + usage.output;
   const cost = estimateCost(providerName, model, usage.input, usage.output);
 
+  commitSpend(session.id, reservation.reserved, cost);
   logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, statusCode, usage.input, usage.output, totalTokens, latencyMs, request);
   updateSessionCounters(session.id, totalTokens, cost);
 

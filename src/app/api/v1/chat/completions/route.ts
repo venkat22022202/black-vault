@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { authenticateProxyRequest, ProxyAuthError } from "@/server/services/proxy-auth";
-import type { SessionLimits } from "@/server/services/proxy-auth";
 import { PROXY_PROVIDERS } from "@/server/services/proxy-providers";
 import { routeModel, getSupportedPrefixes } from "@/server/services/model-router";
 import {
@@ -12,7 +11,12 @@ import {
   createGoogleToOpenaiStream,
 } from "@/server/services/format-translator";
 import { decryptApiKey } from "@/server/services/encryption";
-import { estimateCost } from "@/server/services/proxy-pricing";
+import {
+  estimateCost,
+  estimateRequestCost,
+  extractMaxOutputTokens,
+} from "@/server/services/proxy-pricing";
+import { reserveBudget, commitSpend } from "@/server/services/budget";
 import {
   checkProxyRateLimit,
   checkSessionRpmLimit,
@@ -238,6 +242,42 @@ async function handleUniversalChat(request: NextRequest) {
       for (const [k, v] of Object.entries(authHeaders)) upstreamHeaders.set(k, v);
     }
 
+    // ── Budget reservation (atomic, real-time) ───────────
+    // Reserve a conservative estimate before forwarding; reconciled to the
+    // actual cost after the response in commitSpend().
+    const estimatedCost = estimateRequestCost(
+      targetProvider,
+      model,
+      JSON.stringify(body),
+      extractMaxOutputTokens(body)
+    );
+    const reservation = await reserveBudget(
+      session.id,
+      limits.maxBudget,
+      limits.totalCost,
+      estimatedCost
+    );
+    if (!reservation.allowed) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `Session budget exhausted ($${reservation.spentBefore.toFixed(4)} / $${limits.maxBudget?.toFixed(4)})`,
+            type: "insufficient_quota",
+            code: "budget_exhausted",
+          },
+        },
+        {
+          status: 402,
+          headers: {
+            ...CORS_HEADERS,
+            "X-BlackVault-Session": session.id,
+            "X-BlackVault-Provider": targetProvider,
+            "X-BlackVault-Gateway": "universal",
+          },
+        }
+      );
+    }
+
     // ── Forward to provider ──────────────────────────────
     let upstreamResponse: Response;
     try {
@@ -252,6 +292,7 @@ async function handleUniversalChat(request: NextRequest) {
       clearTimeout(timeout);
     } catch (err) {
       const latencyMs = Date.now() - startTime;
+      commitSpend(session.id, reservation.reserved, 0);
       logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", 502, 0, 0, latencyMs, request);
       return NextResponse.json(
         { error: { message: "Failed to reach provider", type: "server_error", details: err instanceof Error ? err.message : undefined } },
@@ -328,6 +369,7 @@ async function handleUniversalChat(request: NextRequest) {
             const latencyMs = Date.now() - startTime;
             const u = getUsage();
             const cost = estimateCost(targetProvider, model, u.input, u.output);
+            commitSpend(session.id, reservation.reserved, cost);
             logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", statusCode, u.input, u.output, latencyMs, request);
             updateCounters(session.id, u.input + u.output, cost);
           }
@@ -389,6 +431,7 @@ async function handleUniversalChat(request: NextRequest) {
     }
 
     const cost = estimateCost(targetProvider, model, usage.input, usage.output);
+    commitSpend(session.id, reservation.reserved, cost);
     logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", statusCode, usage.input, usage.output, latencyMs, request);
     updateCounters(session.id, usage.input + usage.output, cost);
 

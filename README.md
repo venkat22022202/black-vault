@@ -124,6 +124,33 @@ Set the base URL to `https://your-blackvault.vercel.app/api/v1` and API key to `
 
 The gateway looks up the user's vault key for the target provider automatically. One `bvt_` token can access ALL providers the user has keys for.
 
+## MCP Server
+
+BlackVault is also a **remote MCP server**, so any MCP client (Claude Desktop, Cursor, Claude Code, …) can get **governed** access to your vaulted AI keys. Your MCP config holds a `bvt_` token — never a provider key — and every tool call is subject to your budget caps, rate limits, model restrictions, kill switch, and audit trail.
+
+**Endpoint:** `https://your-blackvault.vercel.app/api/mcp` (JSON-RPC 2.0 over Streamable HTTP)
+
+**Config (Claude Desktop / Cursor `mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "blackvault": {
+      "url": "https://your-blackvault.vercel.app/api/mcp",
+      "headers": { "Authorization": "Bearer bvt_your_token" }
+    }
+  }
+}
+```
+
+**Tools exposed:**
+
+| Tool | What it does |
+|------|--------------|
+| `list_models` | Lists the models this token may use, across your vaulted provider keys. |
+| `chat` | Runs a completion on any allowed model (`gpt-*`, `claude-*`, `gemini-*`, open-source via Nebius). BlackVault injects the real key, enforces budget/rate/model limits, and audits the call. |
+
+The agent never sees a provider key, and revoking the `bvt_` token (or hitting the kill switch) blocks its next MCP call instantly. See [`docs/design/0002-mcp-credential-broker.md`](docs/design/0002-mcp-credential-broker.md) for the roadmap (generic HTTP-credential brokering and upstream-MCP proxying are next).
+
 ## Features
 
 ### Core
@@ -348,7 +375,7 @@ npm start
 - [x] **Universal AI Gateway** -- OpenAI-compatible endpoint, auto-routes to any provider
 - [x] **Per-Session Rate Limiting** -- Configurable RPM/RPD per proxy token
 - [x] **Budget Caps & Model Restrictions** -- Per-token spend limits and model whitelists
-- [ ] **MCP Server** -- Model Context Protocol server for AI coding agents (Claude Code, Cursor, etc.)
+- [x] **MCP Server** -- Remote MCP server (`/api/mcp`) exposing governed `list_models` + `chat` tools to Claude Desktop, Cursor, Claude Code, etc.
 - [ ] **OpenClaw Skill** -- Official skill for the OpenClaw AI assistant
 - [ ] **Groq, Mistral, Together AI** -- More provider support
 - [ ] **Webhook alerts** -- Notify when budget thresholds hit or rate limits trigger

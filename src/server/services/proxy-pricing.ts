@@ -29,6 +29,10 @@ const PRICING: Record<string, [number, number]> = {
 
 const DEFAULT_PRICING: [number, number] = [1.0, 3.0];
 
+// Used when a request does not specify an output cap, so budget reservations
+// still reserve a conservative amount instead of $0.
+const DEFAULT_MAX_OUTPUT_TOKENS = 4096;
+
 export function estimateCost(
   _provider: string,
   model: string | null,
@@ -37,4 +41,42 @@ export function estimateCost(
 ): number {
   const [inputRate, outputRate] = PRICING[model ?? ""] ?? DEFAULT_PRICING;
   return (inputTokens * inputRate + outputTokens * outputRate) / 1_000_000;
+}
+
+/** Rough token estimate from text: ~4 characters per token. */
+export function estimateTokensFromText(text: string): number {
+  if (!text) return 0;
+  return Math.ceil(text.length / 4);
+}
+
+/**
+ * Read the output-token cap from a parsed request body across the common field
+ * names used by OpenAI (`max_tokens` / `max_completion_tokens`), Anthropic
+ * (`max_tokens`) and Google (`generationConfig.maxOutputTokens`).
+ */
+export function extractMaxOutputTokens(
+  body: Record<string, unknown> | null
+): number | null {
+  if (!body) return null;
+  const direct = body.max_tokens ?? body.max_completion_tokens ?? body.max_output_tokens;
+  if (typeof direct === "number") return direct;
+  const gen = body.generationConfig as Record<string, unknown> | undefined;
+  if (gen && typeof gen.maxOutputTokens === "number") return gen.maxOutputTokens;
+  return null;
+}
+
+/**
+ * Conservative upper-bound cost for a request, used to reserve budget *before*
+ * the response is known. Input tokens are estimated from the request body size;
+ * output tokens from the request's max-output cap (falling back to a default).
+ */
+export function estimateRequestCost(
+  provider: string,
+  model: string | null,
+  requestBodyText: string,
+  maxOutputTokens: number | null
+): number {
+  const inputTokens = estimateTokensFromText(requestBodyText);
+  const outputTokens = maxOutputTokens ?? DEFAULT_MAX_OUTPUT_TOKENS;
+  return estimateCost(provider, model, inputTokens, outputTokens);
 }

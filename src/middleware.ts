@@ -17,8 +17,8 @@ export default clerkMiddleware(async (auth, req) => {
 
 export const config = {
   matcher: [
-    // Exclude proxy routes and universal gateway — they use their own bvt_ token auth, not Clerk
-    "/((?!_next|api/proxy/|api/v1/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
+    // Exclude proxy, universal gateway, MCP and egress routes — they use their own bvt_ token auth, not Clerk
+    "/((?!_next|api/proxy/|api/v1/|api/mcp/|api/egress/|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)",
     "/(trpc)(.*)",
   ],
 };
