@@ -15,11 +15,53 @@ import {
   Plug,
   Gauge,
   Globe,
+  Copy,
+  Check,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
+
+// Public, copy-paste setup shown to logged-out visitors.
+const MCP_CONFIG = `{
+  "mcpServers": {
+    "blackvault": {
+      "url": "https://black-vault-murex.vercel.app/api/mcp",
+      "headers": { "Authorization": "Bearer bvt_your_token" }
+    }
+  }
+}`;
+
+const FIREWALL_CURL = `# allowed by policy → 200, real key injected server-side
+curl https://black-vault-murex.vercel.app/api/egress/user \\
+  -H "Authorization: Bearer bvt_your_token"
+
+# prompt-injected misuse → 403 blocked + audited
+curl -X DELETE https://black-vault-murex.vercel.app/api/egress/repos/you/app \\
+  -H "Authorization: Bearer bvt_your_token"`;
+
+function CopyableCode({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="relative rounded-xl border border-void-300 bg-void-50">
+      <pre className="p-4 pr-10 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all overflow-x-auto">
+        {code}
+      </pre>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(code);
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        }}
+        className="absolute top-3 right-3 text-text-muted hover:text-neon-green"
+        aria-label="Copy"
+      >
+        {copied ? <Check className="w-4 h-4 text-neon-green" /> : <Copy className="w-4 h-4" />}
+      </button>
+    </div>
+  );
+}
 
 // ============================================
 // ANIMATED TERMINAL — the firewall in action
@@ -326,6 +368,47 @@ export default function LandingPage() {
                 </div>
               </motion.div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ====== CONNECT / HOW IT WORKS ====== */}
+      <section id="connect" className="py-24 px-6 border-t border-void-300">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
+              Drop-in <span className="text-gradient-green">setup</span>.
+            </h2>
+            <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
+              Mint a <span className="font-mono text-neon-green">bvt_</span> token, then connect any MCP client —
+              Claude Desktop, Cursor, Cline, Claude Code. Your config holds the token, never your real key.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div>
+              <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-text-primary">
+                <Plug className="w-4 h-4 text-neon-cyan" />
+                Connect via MCP
+              </div>
+              <CopyableCode code={MCP_CONFIG} />
+              <p className="mt-3 text-xs text-text-muted">
+                Drop this into <span className="font-mono">claude_desktop_config.json</span> or
+                <span className="font-mono"> mcp.json</span>. Governed by your budget caps, model limits, and kill switch.
+              </p>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-text-primary">
+                <ShieldCheck className="w-4 h-4 text-neon-green" />
+                Or broker any API key
+              </div>
+              <CopyableCode code={FIREWALL_CURL} />
+              <p className="mt-3 text-xs text-text-muted">
+                The secret is injected server-side toward a pinned host. A prompt-injected delete or exfil attempt is
+                blocked and audited — the agent never sees the key.
+              </p>
+            </div>
           </div>
         </div>
       </section>
