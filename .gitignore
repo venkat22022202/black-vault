@@ -47,3 +47,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# vendored reference clones (not part of this app — e.g. a local Infisical fork
+# kept around for study). Re-clone with: git clone <fork-url> infisical
+/infisical/
