@@ -18,6 +18,7 @@ import {
   Wifi,
   Hash,
   ShieldCheck,
+  Plug,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
@@ -544,10 +545,10 @@ export default function DashboardPage() {
             description: "Broker a credential to an agent",
           },
           {
-            label: "View Activity",
-            href: "/activity",
-            icon: Activity,
-            description: "Audit every key, token, and call",
+            label: "Connect via MCP",
+            href: "/mcp",
+            icon: Plug,
+            description: "Use in Claude Desktop, Cursor, Cline",
           },
         ].map((action) => (
           <Link
