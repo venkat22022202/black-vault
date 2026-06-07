@@ -76,6 +76,7 @@ const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
 
 function HeroTerminal() {
   const [visible, setVisible] = useState(0);
+  const cycle = visible === 0;
   useEffect(() => {
     const timers = terminalLines.map((_, i) => setTimeout(() => setVisible(i + 1), 500 + i * 700));
     const restart = setTimeout(() => setVisible(0), 500 + terminalLines.length * 700 + 1800);
@@ -83,7 +84,7 @@ function HeroTerminal() {
       timers.forEach(clearTimeout);
       clearTimeout(restart);
     };
-  }, [visible === 0]);
+  }, [cycle]);
 
   return (
     <div className="relative w-full max-w-3xl mx-auto">
@@ -199,7 +200,7 @@ function FirewallScroll() {
         <div className="relative z-10 w-full max-w-5xl mx-auto px-6 grid lg:grid-cols-[1fr_1.15fr] gap-10 items-center">
           {/* Left: narrative */}
           <div>
-            <div className="font-mono text-xs text-neon-green mb-4">// the firewall, live</div>
+            <div className="font-mono text-xs text-neon-green mb-4">{"// the firewall, live"}</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight leading-[1.05]">
               Prompt-inject it
               <br />
@@ -380,7 +381,7 @@ export default function LandingPage() {
       <section id="features" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-7xl mx-auto">
           <div className="mb-14">
-            <div className="font-mono text-xs text-neon-green mb-3">// what ships</div>
+            <div className="font-mono text-xs text-neon-green mb-3">{"// what ships"}</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight max-w-2xl">
               The guardrails agents were missing.
             </h2>
@@ -413,7 +414,7 @@ export default function LandingPage() {
       <section id="connect" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
-            <div className="font-mono text-xs text-neon-green mb-3">// drop-in setup</div>
+            <div className="font-mono text-xs text-neon-green mb-3">{"// drop-in setup"}</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
               Connect in <span className="text-gradient-green">30 seconds</span>.
             </h2>
