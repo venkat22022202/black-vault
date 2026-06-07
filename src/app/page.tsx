@@ -13,7 +13,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
 
@@ -165,8 +165,49 @@ const features = [
 // PAGE
 // ============================================
 export default function LandingPage() {
+  const keySecRef = useRef<HTMLElement>(null);
+  const keyRef = useRef<HTMLSpanElement>(null);
+  const hSecRef = useRef<HTMLElement>(null);
+  const l1Ref = useRef<HTMLDivElement>(null);
+  const l2Ref = useRef<HTMLDivElement>(null);
+
+  // Drive the key-sweep and horizontal lines from real scroll position (rAF).
+  // Reliable with Lenis, and content is visible by default so it can't black out.
+  useEffect(() => {
+    const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+    let raf = 0;
+    const loop = () => {
+      const vh = window.innerHeight;
+
+      const ks = keySecRef.current;
+      const k = keyRef.current;
+      if (ks && k) {
+        const r = ks.getBoundingClientRect();
+        const p = clamp((vh - r.top) / (vh * 0.9));
+        k.style.setProperty("--sweep", `${(p * 100).toFixed(1)}%`);
+      }
+
+      const hs = hSecRef.current;
+      const l1 = l1Ref.current;
+      const l2 = l2Ref.current;
+      if (hs && l1 && l2) {
+        const r = hs.getBoundingClientRect();
+        const total = r.height - vh;
+        const p = total > 0 ? clamp(-r.top / total) : 0;
+        const o1 = Math.max(0, l1.scrollWidth - window.innerWidth);
+        const o2 = Math.max(0, l2.scrollWidth - window.innerWidth);
+        l1.style.transform = `translateX(${(-p * o1).toFixed(1)}px)`;
+        l2.style.transform = `translateX(${(-(1 - p) * o2).toFixed(1)}px)`;
+      }
+
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
   return (
-    <div className="min-h-screen bg-void-0 overflow-x-hidden">
+    <div className="min-h-screen bg-void-0 overflow-x-clip">
       <SmoothScroll />
 
       {/* NAV */}
@@ -256,7 +297,10 @@ export default function LandingPage() {
       <Marquee />
 
       {/* CENTERPIECE 1 — Key -> Token: the key recolors red->green (vaulted) on scroll */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-28 text-center border-t border-void-300">
+      <section
+        ref={keySecRef}
+        className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-28 text-center border-t border-void-300"
+      >
         <div className="absolute inset-0 bg-grid opacity-30" />
         <div
           className="absolute -inset-40 animate-aurora opacity-50"
@@ -268,7 +312,11 @@ export default function LandingPage() {
         <div className="relative z-10 w-full">
           <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
 
-          <span className="key-sweep block w-max max-w-full mx-auto font-mono font-bold tracking-tight whitespace-nowrap text-[7vw] md:text-[4.6vw]">
+          <span
+            ref={keyRef}
+            style={{ ["--sweep" as string]: "0%" }}
+            className="key-sweep block w-max max-w-full mx-auto font-mono font-bold tracking-tight whitespace-nowrap text-[7vw] md:text-[4.6vw]"
+          >
             {SECRET_KEY}
           </span>
 
@@ -285,19 +333,19 @@ export default function LandingPage() {
       </section>
 
       {/* CENTERPIECE 2 — two counter-scrolling kinetic lines (pinned, fills the screen) */}
-      <section className="relative h-[150vh] htrack border-t border-void-300">
+      <section ref={hSecRef} className="relative h-[150vh] border-t border-void-300">
         <div className="sticky top-0 h-screen flex flex-col justify-center gap-4 md:gap-8 overflow-hidden grain">
           <div className="absolute inset-0 bg-grid opacity-25" />
           <div
             className="absolute -inset-40 animate-aurora opacity-40"
             style={{ background: "radial-gradient(45% 45% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
           />
-          <div className="hscroll-l whitespace-nowrap w-max relative z-10">
+          <div ref={l1Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
             <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-text-primary">
               ONE KEY, VAULTED.&nbsp;&nbsp;<span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
             </span>
           </div>
-          <div className="hscroll-r whitespace-nowrap w-max relative z-10">
+          <div ref={l2Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
             <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-neon-green">
               KILL IT IN ONE CLICK.&nbsp;&nbsp;ZERO BLAST RADIUS.&nbsp;&nbsp;
             </span>
