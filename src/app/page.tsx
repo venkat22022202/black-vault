@@ -74,17 +74,16 @@ const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
 ];
 
 function HeroTerminal() {
-  const [visible, setVisible] = useState(terminalLines.length);
-  const cycle = visible >= terminalLines.length;
+  const [visible, setVisible] = useState(0);
   useEffect(() => {
-    setVisible(0);
-    const timers = terminalLines.map((_, i) => setTimeout(() => setVisible(i + 1), 400 + i * 650));
-    const restart = setTimeout(() => setVisible(terminalLines.length), 400 + terminalLines.length * 650 + 2200);
-    return () => {
-      timers.forEach(clearTimeout);
-      clearTimeout(restart);
-    };
-  }, [cycle]);
+    let n = 0;
+    const id = setInterval(() => {
+      // type up to all lines, hold ~3 ticks, then restart — setState only in callback
+      n = n + 1 > terminalLines.length + 3 ? 0 : n + 1;
+      setVisible(Math.min(n, terminalLines.length));
+    }, 550);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="relative w-full max-w-3xl mx-auto">
