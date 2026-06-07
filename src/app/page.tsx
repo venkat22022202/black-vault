@@ -195,7 +195,7 @@ export default function LandingPage() {
         const p = total > 0 ? clamp(-r.top / total) : 0;
         const steps = CONVEYOR.length - 1;
         const active = p * steps; // fractional index of the centered beat
-        const spacing = window.innerWidth * 0.46; // distance between adjacent beats
+        const spacing = window.innerWidth * 0.4; // distance between adjacent beats
         // Each beat is absolutely centered, offset by its distance from `active`,
         // scaled big(right)->normal(center)->small(left), faded + blurred at the edges.
         const kids = track.children;
@@ -287,7 +287,7 @@ export default function LandingPage() {
               <span
                 key={i}
                 className={cn(
-                  "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap will-change-transform font-display font-bold tracking-tight leading-none text-[11vw]",
+                  "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap will-change-transform font-display font-bold tracking-tight leading-none text-[6.5vw]",
                   b.g ? "text-gradient-green" : "text-text-primary"
                 )}
               >
