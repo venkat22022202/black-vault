@@ -191,7 +191,20 @@ export default function LandingPage() {
         const total = r.height - vh;
         const p = total > 0 ? clamp(-r.top / total) : 0;
         const steps = CONVEYOR.length - 1;
-        track.style.transform = `translateX(${(-p * steps * window.innerWidth).toFixed(1)}px)`;
+        const active = p * steps; // fractional index of the centered beat
+        track.style.transform = `translateX(${(-active * window.innerWidth).toFixed(1)}px)`;
+        // Depth: right (upcoming) = bigger, center = full size, left (past) = small + faded + blurred
+        const kids = track.children;
+        for (let i = 0; i < kids.length; i++) {
+          const n = i - active; // panel offset from center, in panel-widths
+          const scale = clamp(1 + n * 0.3, 0.55, 1.4);
+          const opacity = clamp(1 - Math.abs(n) * 0.55, 0, 1);
+          const blur = Math.min(Math.abs(n) * 3, 6);
+          const el = kids[i] as HTMLElement;
+          el.style.transform = `scale(${scale.toFixed(3)})`;
+          el.style.opacity = opacity.toFixed(3);
+          el.style.filter = `blur(${blur.toFixed(1)}px)`;
+        }
       }
 
       // Section 3 — two crossing lines
@@ -265,7 +278,7 @@ export default function LandingPage() {
           </div>
           <div ref={trackRef} className="hscroll-line relative z-10 flex h-screen items-center">
             {CONVEYOR.map((b, i) => (
-              <div key={i} className="shrink-0 w-screen flex items-center justify-center px-6 text-center">
+              <div key={i} className="shrink-0 w-screen flex items-center justify-center px-6 text-center will-change-transform">
                 <span
                   className={cn(
                     "font-display font-bold tracking-tight leading-none whitespace-nowrap text-[11vw]",
