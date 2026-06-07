@@ -36,6 +36,10 @@ curl https://black-vault-murex.vercel.app/api/egress/user \\
 curl -X DELETE https://black-vault-murex.vercel.app/api/egress/repos/you/app \\
   -H "Authorization: Bearer bvt_your_token"`;
 
+const SECRET_KEY = "sk-live-51H8aZ7pQxR3mN9kV";
+const SECRET_DOTS = "•".repeat(SECRET_KEY.length);
+const BVT_TOKEN = "bvt_3f9a2c8e4d";
+
 // ============================================
 // COPYABLE CODE
 // ============================================
@@ -252,23 +256,50 @@ export default function LandingPage() {
       {/* MARQUEE */}
       <Marquee />
 
-      {/* BATTERY-FILL CENTERPIECE — scroll fills AIRTIGHT bottom-up */}
-      <section className="relative h-[200vh] battery-track border-t border-void-300">
+      {/* CENTERPIECE 1 — Key -> Token: scroll seals the key into a token */}
+      <section className="relative h-[220vh] key-vault-track border-t border-void-300">
         <div className="sticky top-0 h-screen flex flex-col items-center justify-center overflow-hidden grain px-6 text-center">
           <div className="absolute inset-0 bg-grid opacity-25" />
           <div
             className="absolute -inset-40 animate-aurora opacity-40"
-            style={{ background: "radial-gradient(40% 40% at 50% 55%, rgba(0,255,136,0.08), transparent 70%)" }}
+            style={{ background: "radial-gradient(40% 40% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
           />
-          <div className="relative z-10">
-            <div className="font-mono text-xs text-neon-green mb-6">{"// blast radius -> zero"}</div>
-            <h2 className="fill-text font-display font-bold tracking-tight leading-none text-[22vw] md:text-[17vw]">
-              AIRTIGHT
-            </h2>
-            <p className="mt-6 text-text-secondary max-w-xl mx-auto leading-relaxed">
-              Hand an agent a real credential. It works — but the secret never leaks, the host is pinned, and misuse is
-              blocked. Scroll sealed it; nothing else gets through.
-            </p>
+          <div className="relative z-10 w-full">
+            <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
+
+            {/* the real key (red) overlaid by green dots that wipe across on scroll */}
+            <div className="relative inline-block">
+              <span className="block font-mono font-bold tracking-tight whitespace-nowrap text-neon-red text-[6vw] md:text-[4.4vw]">
+                {SECRET_KEY}
+              </span>
+              <span className="key-sealed block absolute inset-0 font-mono font-bold tracking-tight whitespace-nowrap text-neon-green text-[6vw] md:text-[4.4vw]">
+                {SECRET_DOTS}
+              </span>
+            </div>
+
+            <div className="mt-14 flex flex-col items-center gap-4">
+              <span className="font-mono text-xs text-text-muted tracking-widest">VAULTED · ENCRYPTED · SCOPED ↓</span>
+              <div className="font-mono text-2xl md:text-4xl font-bold text-neon-green px-6 py-3 rounded-xl border border-neon-green/30 bg-neon-green/5 shadow-[0_0_30px_rgba(0,255,136,0.15)]">
+                {BVT_TOKEN}
+              </div>
+              <p className="text-text-secondary max-w-md mt-3 leading-relaxed">
+                The agent gets this token — never your key. Cap it, audit it, and revoke it in one click.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CENTERPIECE 2 — horizontal kinetic line (pinned, scrolls sideways) */}
+      <section className="relative h-[250vh] htrack border-t border-void-300">
+        <div className="sticky top-0 h-screen flex items-center overflow-hidden grain">
+          <div className="hscroll whitespace-nowrap w-max">
+            <span className="font-display font-bold tracking-tight leading-none text-[13vw] text-text-primary">
+              ONE KEY, VAULTED.&nbsp;&nbsp;
+              <span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
+              KILL IT IN ONE CLICK.&nbsp;&nbsp;
+              <span className="text-neon-green">ZERO BLAST RADIUS.</span>
+            </span>
           </div>
         </div>
       </section>
