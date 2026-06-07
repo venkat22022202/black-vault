@@ -1,29 +1,25 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Lock,
   ShieldCheck,
-  Activity,
   Zap,
   Ban,
   ArrowRight,
-  Terminal,
-  Sparkles,
   Star,
   Plug,
   Gauge,
-  Globe,
   Copy,
   Check,
 } from "lucide-react";
-import { useEffect, useState } from "react";
-import { trpc } from "@/lib/trpc";
+import { useEffect, useRef, useState } from "react";
+import { cn } from "@/lib/utils";
+import SmoothScroll from "@/components/smooth-scroll";
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
-// Public, copy-paste setup shown to logged-out visitors.
 const MCP_CONFIG = `{
   "mcpServers": {
     "blackvault": {
@@ -33,19 +29,22 @@ const MCP_CONFIG = `{
   }
 }`;
 
-const FIREWALL_CURL = `# allowed by policy → 200, real key injected server-side
+const FIREWALL_CURL = `# allowed by policy -> 200, real key injected server-side
 curl https://black-vault-murex.vercel.app/api/egress/user \\
   -H "Authorization: Bearer bvt_your_token"
 
-# prompt-injected misuse → 403 blocked + audited
+# prompt-injected misuse -> 403 blocked + audited
 curl -X DELETE https://black-vault-murex.vercel.app/api/egress/repos/you/app \\
   -H "Authorization: Bearer bvt_your_token"`;
 
+// ============================================
+// COPYABLE CODE
+// ============================================
 function CopyableCode({ code }: { code: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <div className="relative rounded-xl border border-void-300 bg-void-50">
-      <pre className="p-4 pr-10 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all overflow-x-auto">
+      <pre className="p-4 pr-10 text-xs font-mono text-text-secondary whitespace-pre-wrap break-all overflow-x-auto leading-relaxed">
         {code}
       </pre>
       <button
@@ -54,7 +53,7 @@ function CopyableCode({ code }: { code: string }) {
           setCopied(true);
           setTimeout(() => setCopied(false), 1500);
         }}
-        className="absolute top-3 right-3 text-text-muted hover:text-neon-green"
+        className="absolute top-3 right-3 text-text-muted hover:text-neon-green transition-colors"
         aria-label="Copy"
       >
         {copied ? <Check className="w-4 h-4 text-neon-green" /> : <Copy className="w-4 h-4" />}
@@ -64,53 +63,62 @@ function CopyableCode({ code }: { code: string }) {
 }
 
 // ============================================
-// ANIMATED TERMINAL — the firewall in action
+// HERO TERMINAL (asset-free, monochrome status dots)
 // ============================================
-const terminalLines = [
-  { text: "$ agent → blackvault → api.github.com", color: "text-text-secondary", delay: 0 },
-  { text: "  ● GET  /repos/octocat/app      200   injected ghp_•••• (key never seen by agent)", color: "text-neon-green", delay: 800 },
-  { text: "  ● GET  /user                   200   allowed by policy", color: "text-neon-green", delay: 1600 },
-  { text: "  ✖ POST https://attacker.com    BLOCKED  host not pinned — exfil attempt", color: "text-neon-red", delay: 2400 },
-  { text: "  ✖ DELETE /repos/octocat/app    403   method not allowed (read-only token)", color: "text-neon-red", delay: 3200 },
-  { text: "  ● GET  /repos/octocat/issues   200   allowed by policy", color: "text-neon-green", delay: 4000 },
+const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
+  { s: "cmd", text: "agent -> blackvault -> api.github.com" },
+  { s: "ok", text: "GET  /repos/octocat/app    200   key injected (agent never sees it)" },
+  { s: "ok", text: "GET  /user                 200   allowed by policy" },
+  { s: "block", text: "POST attacker.com          BLOCKED  host not pinned" },
+  { s: "block", text: "DELETE /repos/octocat      403   method not allowed" },
+  { s: "ok", text: "GET  /repos/octocat/issues 200   allowed by policy" },
 ];
 
-function AnimatedTerminal() {
-  const [visibleLines, setVisibleLines] = useState(0);
-
+function HeroTerminal() {
+  const [visible, setVisible] = useState(0);
   useEffect(() => {
-    const timers = terminalLines.map((line, i) =>
-      setTimeout(() => setVisibleLines(i + 1), line.delay + 500)
-    );
-    const restartTimer = setTimeout(() => setVisibleLines(0), 6500);
+    const timers = terminalLines.map((_, i) => setTimeout(() => setVisible(i + 1), 500 + i * 700));
+    const restart = setTimeout(() => setVisible(0), 500 + terminalLines.length * 700 + 1800);
     return () => {
       timers.forEach(clearTimeout);
-      clearTimeout(restartTimer);
+      clearTimeout(restart);
     };
-  }, [visibleLines === 0]);
+  }, [visible === 0]);
 
   return (
     <div className="relative w-full max-w-3xl mx-auto">
-      <div className="rounded-xl border border-void-300 bg-void-50 overflow-hidden shadow-2xl">
+      <div className="rounded-xl border border-void-300 bg-void-50/90 backdrop-blur overflow-hidden shadow-2xl">
         <div className="flex items-center gap-2 px-4 py-3 border-b border-void-300 bg-void-100">
-          <div className="w-3 h-3 rounded-full bg-neon-red/80" />
-          <div className="w-3 h-3 rounded-full bg-neon-amber/80" />
-          <div className="w-3 h-3 rounded-full bg-neon-green/80" />
+          <div className="w-3 h-3 rounded-full bg-neon-red/70" />
+          <div className="w-3 h-3 rounded-full bg-neon-amber/70" />
+          <div className="w-3 h-3 rounded-full bg-neon-green/70" />
           <span className="ml-2 text-xs text-text-muted font-mono">blackvault — egress firewall</span>
         </div>
-        <div className="p-4 font-mono text-[11px] sm:text-sm leading-relaxed min-h-[200px] overflow-x-auto">
-          {terminalLines.slice(0, visibleLines).map((line, i) => (
+        <div className="p-4 font-mono text-[11px] sm:text-[13px] leading-relaxed min-h-[210px]">
+          {terminalLines.slice(0, visible).map((line, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, x: -10 }}
+              initial={{ opacity: 0, x: -8 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`${line.color} whitespace-nowrap`}
+              transition={{ duration: 0.25 }}
+              className="flex items-center gap-2 whitespace-nowrap"
             >
-              {line.text}
+              {line.s === "cmd" ? (
+                <span className="text-text-muted">$ {line.text}</span>
+              ) : (
+                <>
+                  <span
+                    className={cn(
+                      "w-1.5 h-1.5 rounded-full shrink-0",
+                      line.s === "ok" ? "bg-neon-green" : "bg-neon-red"
+                    )}
+                  />
+                  <span className={line.s === "ok" ? "text-text-secondary" : "text-neon-red"}>{line.text}</span>
+                </>
+              )}
             </motion.div>
           ))}
-          <span className="inline-block w-2 h-4 bg-neon-green ml-1 animate-terminal-blink" />
+          <span className="inline-block w-2 h-4 bg-neon-green ml-1 align-middle animate-terminal-blink" />
         </div>
       </div>
     </div>
@@ -118,61 +126,146 @@ function AnimatedTerminal() {
 }
 
 // ============================================
-// FEATURES — the real, shipped product
+// MARQUEE
+// ============================================
+const MARQUEE = [
+  "OpenAI", "Anthropic", "Google", "Nebius", "Claude Desktop", "Cursor",
+  "Cline", "LangChain", "CrewAI", "AutoGen", "GitHub", "Stripe",
+];
+
+function Group() {
+  return (
+    <div className="flex shrink-0">
+      {MARQUEE.map((t, i) => (
+        <span key={i} className="font-mono text-sm text-text-muted px-7 flex items-center gap-7">
+          {t}
+          <span className="text-neon-green/30">/</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function Marquee() {
+  return (
+    <div className="overflow-hidden border-y border-void-300 py-6 mask-fade-x">
+      <div className="flex w-max animate-marquee">
+        <Group />
+        <Group />
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// SCROLL-SCRUBBED FIREWALL BEAT
+// ============================================
+function FirewallScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
+
+  const barH = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
+  const monOpacity = useTransform(scrollYProgress, [0.4, 0.5], [1, 0]);
+  const enfOpacity = useTransform(scrollYProgress, [0.5, 0.62], [0, 1]);
+  const summaryOpacity = useTransform(scrollYProgress, [0.8, 0.94], [0, 1]);
+
+  const o1 = useTransform(scrollYProgress, [0.06, 0.16], [0, 1]);
+  const x1 = useTransform(scrollYProgress, [0.06, 0.16], [-24, 0]);
+  const o2 = useTransform(scrollYProgress, [0.22, 0.32], [0, 1]);
+  const x2 = useTransform(scrollYProgress, [0.22, 0.32], [-24, 0]);
+  const o3 = useTransform(scrollYProgress, [0.44, 0.54], [0, 1]);
+  const x3 = useTransform(scrollYProgress, [0.44, 0.54], [-24, 0]);
+  const o4 = useTransform(scrollYProgress, [0.62, 0.72], [0, 1]);
+  const x4 = useTransform(scrollYProgress, [0.62, 0.72], [-24, 0]);
+
+  const rows = [
+    { o: o1, x: x1, ok: true, method: "GET", path: "/repos/octocat/app", note: "200 · key injected server-side" },
+    { o: o2, x: x2, ok: true, method: "GET", path: "/user", note: "200 · allowed by policy" },
+    { o: o3, x: x3, ok: false, method: "POST", path: "attacker.com", note: "blocked · host not pinned" },
+    { o: o4, x: x4, ok: false, method: "DELETE", path: "/repos/octocat/app", note: "403 · method not allowed" },
+  ];
+
+  return (
+    <section ref={ref} className="relative h-[280vh] border-t border-void-300">
+      <div className="sticky top-0 h-screen flex items-center overflow-hidden grain">
+        <div className="absolute inset-0 bg-grid opacity-30" />
+        <div
+          className="absolute -inset-40 animate-aurora opacity-50"
+          style={{
+            background:
+              "radial-gradient(40% 40% at 35% 40%, rgba(239,68,68,0.08), transparent 70%), radial-gradient(40% 40% at 65% 55%, rgba(0,255,136,0.08), transparent 70%)",
+          }}
+        />
+        <div className="relative z-10 w-full max-w-5xl mx-auto px-6 grid lg:grid-cols-[1fr_1.15fr] gap-10 items-center">
+          {/* Left: narrative */}
+          <div>
+            <div className="font-mono text-xs text-neon-green mb-4">// the firewall, live</div>
+            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight leading-[1.05]">
+              Prompt-inject it
+              <br />
+              all you want.
+            </h2>
+            <div className="relative h-9 mt-6">
+              <motion.div style={{ opacity: monOpacity }} className="absolute font-mono text-xl text-text-muted">
+                status: MONITORING
+              </motion.div>
+              <motion.div style={{ opacity: enfOpacity }} className="absolute font-mono text-xl text-neon-red">
+                status: ENFORCED
+              </motion.div>
+            </div>
+            <motion.p style={{ opacity: summaryOpacity }} className="mt-6 text-text-secondary max-w-md leading-relaxed">
+              The secret never leaves the vault. The host is pinned. The policy is law. The agent gets exactly what you
+              allow — nothing more.
+            </motion.p>
+          </div>
+
+          {/* Right: scrubbed log */}
+          <div className="relative rounded-2xl border border-void-300 bg-void-50/80 backdrop-blur p-5 pl-6">
+            <motion.div style={{ height: barH }} className="absolute left-0 top-0 w-[2px] bg-neon-green" />
+            <div className="font-mono text-xs text-text-muted mb-5">agent → blackvault → upstream</div>
+            <div className="space-y-3">
+              {rows.map((r, i) => (
+                <motion.div key={i} style={{ opacity: r.o, x: r.x }} className="font-mono text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", r.ok ? "bg-neon-green" : "bg-neon-red")} />
+                    <span className={cn("w-16 shrink-0", r.ok ? "text-text-secondary" : "text-neon-red")}>{r.method}</span>
+                    <span className="text-text-muted flex-1 truncate">{r.path}</span>
+                    <span className={cn("shrink-0 font-semibold", r.ok ? "text-neon-green" : "text-neon-red")}>
+                      {r.ok ? "ALLOW" : "BLOCK"}
+                    </span>
+                  </div>
+                  <div className="pl-[1.625rem] text-[10px] text-text-muted/70 mt-0.5">{r.note}</div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ============================================
+// FEATURES (editorial cards, no icon-boxes)
 // ============================================
 const features = [
-  {
-    icon: ShieldCheck,
-    title: "Egress Firewall",
-    description:
-      "Give an agent your GitHub / Stripe / DB key through a scoped token. The host is pinned, methods and paths are allowlisted, and the secret is injected server-side — it can't be stolen or misused, even under prompt injection.",
-    color: "text-neon-green",
-  },
-  {
-    icon: Plug,
-    title: "MCP Server",
-    description:
-      "A drop-in MCP server for Claude Desktop, Cursor, and Claude Code. Agents get governed, vaulted AI access — the config holds a bvt_ token, never a provider key.",
-    color: "text-neon-cyan",
-  },
-  {
-    icon: Lock,
-    title: "Encrypted Vault",
-    description:
-      "AES-256-GCM with per-key derived keys. The secret is decrypted only in-flight and never returned to the agent. Proxy tokens are SHA-256 hashed before storage.",
-    color: "text-neon-green",
-  },
-  {
-    icon: Zap,
-    title: "Universal Gateway",
-    description:
-      "One OpenAI-compatible endpoint for every provider. Auto-routes by model and translates tool calls and images across OpenAI, Anthropic, and Google.",
-    color: "text-neon-purple",
-  },
-  {
-    icon: Ban,
-    title: "Instant Kill Switch",
-    description:
-      "Revoke a token, a key, or everything. Revocation invalidates the session cache, so a killed token fails on its very next call.",
-    color: "text-neon-red",
-  },
-  {
-    icon: Gauge,
-    title: "Budget & Rate Caps",
-    description:
-      "Per-token spend caps and RPM/RPD limits, enforced atomically in real time — a burst of concurrent calls can't blow past the cap.",
-    color: "text-neon-amber",
-  },
+  { icon: ShieldCheck, title: "Egress Firewall", desc: "Give an agent your GitHub / Stripe / DB key through a scoped token. Host pinned, methods and paths allowlisted, secret injected server-side." },
+  { icon: Plug, title: "MCP Server", desc: "A drop-in MCP server for Claude Desktop, Cursor and Claude Code. The config holds a bvt_ token, never a provider key." },
+  { icon: Lock, title: "Encrypted Vault", desc: "AES-256-GCM with per-key derived keys. Decrypted only in-flight, never returned to the agent." },
+  { icon: Zap, title: "Universal Gateway", desc: "One OpenAI-compatible endpoint for every provider. Auto-routes by model, translates tool calls and images." },
+  { icon: Ban, title: "Instant Kill Switch", desc: "Revoke a token, a key, or everything. The next call fails immediately." },
+  { icon: Gauge, title: "Budget & Rate Caps", desc: "Per-token spend caps and RPM/RPD limits, enforced atomically — a burst can't blow past the cap." },
 ];
 
 // ============================================
 // PAGE
 // ============================================
 export default function LandingPage() {
-  const { data: publicStats } = trpc.stats.getPublicStats.useQuery();
   return (
-    <div className="min-h-screen bg-void-0 overflow-hidden">
-      {/* ====== NAV ====== */}
+    <div className="min-h-screen bg-void-0 overflow-x-hidden">
+      <SmoothScroll />
+
+      {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" className="font-mono text-xl font-bold tracking-tight text-neon-green">
@@ -202,24 +295,29 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* ====== HERO ====== */}
-      <section className="relative pt-32 pb-20 px-6">
-        <div className="absolute inset-0 bg-grid opacity-50" />
+      {/* HERO */}
+      <section className="relative pt-32 pb-20 px-6 grain">
+        <div className="absolute inset-0 bg-grid opacity-40" />
         <div className="absolute inset-0 bg-radial-fade" />
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-neon-green/5 blur-[120px]" />
+        <div
+          className="absolute -inset-40 animate-aurora opacity-60"
+          style={{
+            background:
+              "radial-gradient(40% 40% at 30% 35%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 70% 60%, rgba(6,182,212,0.07), transparent 70%)",
+          }}
+        />
 
         <div className="relative z-10 max-w-5xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-medium text-neon-green">
-              <Sparkles className="w-3 h-3 text-neon-green" />
-              Open source · MIT · the credential firewall for AI agents
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
+            <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green">
+              open source · MIT · credential firewall for AI agents
             </span>
           </motion.div>
 
           <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
+            transition={{ duration: 0.6, delay: 0.08 }}
             className="mt-8 font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95]"
           >
             Arm your AI agents.
@@ -230,23 +328,22 @@ export default function LandingPage() {
           <motion.p
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
+            transition={{ duration: 0.6, delay: 0.16 }}
             className="mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed"
           >
-            Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token.
-            Cap it, audit it, and kill it in one click — and even if it&apos;s prompt-injected, it can&apos;t steal the
-            key or misuse it.
+            Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
+            it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
           </motion.p>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
+            transition={{ duration: 0.6, delay: 0.24 }}
             className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link
               href="/sign-up"
-              className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)] animate-pulse-glow"
+              className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]"
             >
               Start free
               <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -265,123 +362,64 @@ export default function LandingPage() {
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.5 }}
+            transition={{ duration: 0.7, delay: 0.4 }}
             className="mt-16"
           >
-            <AnimatedTerminal />
+            <HeroTerminal />
           </motion.div>
         </div>
       </section>
 
-      {/* ====== STATS BAR ====== */}
-      <section className="border-y border-void-300 bg-void-50/50">
-        <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-2 md:grid-cols-4 gap-8">
-          {[
-            { label: "Keys secured", value: (publicStats?.keys ?? 0).toLocaleString() },
-            { label: "Providers", value: "OpenAI · Anthropic · Google · Nebius" },
-            { label: "License", value: "MIT" },
-            { label: "Hosting", value: "Self-host or deploy" },
-          ].map((stat) => (
-            <div key={stat.label} className="text-center">
-              <div className="text-base md:text-xl font-mono font-bold text-text-primary">{stat.value}</div>
-              <div className="mt-1 text-sm text-text-muted">{stat.label}</div>
-            </div>
-          ))}
-        </div>
-      </section>
+      {/* MARQUEE */}
+      <Marquee />
 
-      {/* ====== FEATURES ====== */}
-      <section id="features" className="py-24 px-6">
+      {/* SCROLL-SCRUBBED FIREWALL */}
+      <FirewallScroll />
+
+      {/* FEATURES */}
+      <section id="features" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
+          <div className="mb-14">
+            <div className="font-mono text-xs text-neon-green mb-3">// what ships</div>
+            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight max-w-2xl">
               The guardrails agents were missing.
             </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature, i) => (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-void-300 border border-void-300 rounded-xl overflow-hidden">
+            {features.map((f, i) => (
               <motion.div
-                key={feature.title}
-                initial={{ opacity: 0, y: 20 }}
+                key={f.title}
+                initial={{ opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.08 }}
-                className="group relative rounded-xl border border-void-300 bg-void-50 p-6 hover:border-void-400 transition-all duration-300"
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.5, delay: (i % 3) * 0.06 }}
+                className="group relative bg-void-50 p-7 hover:bg-void-100 transition-colors"
               >
-                <feature.icon className={`w-8 h-8 ${feature.color} mb-4`} />
-                <h3 className="text-lg font-semibold text-text-primary mb-2">{feature.title}</h3>
-                <p className="text-sm text-text-secondary leading-relaxed">{feature.description}</p>
+                <div className="absolute top-0 left-0 h-px w-full bg-gradient-to-r from-neon-green/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="flex items-center justify-between mb-5">
+                  <span className="font-mono text-xs text-text-muted">0{i + 1}</span>
+                  <f.icon className="w-4 h-4 text-text-muted group-hover:text-neon-green transition-colors" />
+                </div>
+                <h3 className="text-lg font-semibold text-text-primary mb-2">{f.title}</h3>
+                <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ====== HOW IT WORKS ====== */}
-      <section className="py-24 px-6 border-t border-void-300">
-        <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
-              Three steps. <span className="text-gradient-green">Zero blast radius.</span>
-            </h2>
-          </div>
-
-          <div className="space-y-12">
-            {[
-              {
-                step: "01",
-                title: "Vault the secret",
-                description:
-                  "Add an API key or credential. It's encrypted with AES-256-GCM using a per-key derived key — and never returned to the agent.",
-                icon: Lock,
-              },
-              {
-                step: "02",
-                title: "Mint a scoped token",
-                description:
-                  "Generate a bvt_ token per agent with a policy: allowed hosts, methods and paths, a budget cap, and rate limits.",
-                icon: Globe,
-              },
-              {
-                step: "03",
-                title: "Ship it safely",
-                description:
-                  "The agent works through the token — it can't see, steal, or misuse the secret. Every call is audited, and one click kills it.",
-                icon: ShieldCheck,
-              },
-            ].map((item, i) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.15 }}
-                className="flex gap-6 items-start"
-              >
-                <div className="flex-shrink-0 w-14 h-14 rounded-xl border border-void-400 bg-void-100 flex items-center justify-center">
-                  <span className="font-mono text-lg font-bold text-neon-green">{item.step}</span>
-                </div>
-                <div>
-                  <h3 className="text-xl font-semibold text-text-primary mb-1">{item.title}</h3>
-                  <p className="text-text-secondary leading-relaxed">{item.description}</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ====== CONNECT / HOW IT WORKS ====== */}
+      {/* DROP-IN SETUP */}
       <section id="connect" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-12">
+            <div className="font-mono text-xs text-neon-green mb-3">// drop-in setup</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
-              Drop-in <span className="text-gradient-green">setup</span>.
+              Connect in <span className="text-gradient-green">30 seconds</span>.
             </h2>
             <p className="mt-4 text-text-secondary max-w-2xl mx-auto">
-              Mint a <span className="font-mono text-neon-green">bvt_</span> token, then connect any MCP client —
-              Claude Desktop, Cursor, Cline, Claude Code. Your config holds the token, never your real key.
+              Mint a <span className="font-mono text-neon-green">bvt_</span> token, then plug it into any MCP client — or
+              broker any API key over HTTP. Your config holds the token, never your real key.
             </p>
           </div>
 
@@ -393,38 +431,75 @@ export default function LandingPage() {
               </div>
               <CopyableCode code={MCP_CONFIG} />
               <p className="mt-3 text-xs text-text-muted">
-                Drop this into <span className="font-mono">claude_desktop_config.json</span> or
-                <span className="font-mono"> mcp.json</span>. Governed by your budget caps, model limits, and kill switch.
+                Drop into <span className="font-mono">claude_desktop_config.json</span> or
+                <span className="font-mono"> mcp.json</span>. Governed by your budget caps, model limits and kill switch.
               </p>
             </div>
-
             <div>
               <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-text-primary">
                 <ShieldCheck className="w-4 h-4 text-neon-green" />
-                Or broker any API key
+                Broker any API key
               </div>
               <CopyableCode code={FIREWALL_CURL} />
               <p className="mt-3 text-xs text-text-muted">
-                The secret is injected server-side toward a pinned host. A prompt-injected delete or exfil attempt is
-                blocked and audited — the agent never sees the key.
+                Injected server-side toward a pinned host. A prompt-injected delete or exfil attempt is blocked and
+                audited — the agent never sees the key.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ====== CTA ====== */}
-      <section className="py-24 px-6">
+      {/* HOW IT WORKS */}
+      <section className="py-24 px-6 border-t border-void-300">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
+              Three steps. <span className="text-gradient-green">Zero blast radius.</span>
+            </h2>
+          </div>
+          <div className="space-y-12">
+            {[
+              { step: "01", title: "Vault the secret", desc: "Add an API key or credential. Encrypted with AES-256-GCM using a per-key derived key — and never returned to the agent." },
+              { step: "02", title: "Mint a scoped token", desc: "Generate a bvt_ token per agent with a policy: allowed hosts, methods and paths, a budget cap, and rate limits." },
+              { step: "03", title: "Ship it safely", desc: "The agent works through the token — it cannot see, steal, or misuse the secret. Every call is audited; one click kills it." },
+            ].map((item, i) => (
+              <motion.div
+                key={item.step}
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.12 }}
+                className="flex gap-6 items-start"
+              >
+                <div className="shrink-0 w-14 h-14 rounded-xl border border-void-400 bg-void-100 flex items-center justify-center">
+                  <span className="font-mono text-lg font-bold text-neon-green">{item.step}</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold text-text-primary mb-1">{item.title}</h3>
+                  <p className="text-text-secondary leading-relaxed">{item.desc}</p>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="py-24 px-6 border-t border-void-300">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="relative rounded-2xl border border-void-300 bg-void-50 p-12 md:p-16 overflow-hidden">
-            <div className="absolute inset-0 bg-radial-fade opacity-50" />
+          <div className="relative rounded-2xl border border-void-300 bg-void-50 p-12 md:p-16 overflow-hidden grain">
+            <div className="absolute inset-0 bg-radial-fade opacity-60" />
+            <div
+              className="absolute -inset-40 animate-aurora opacity-40"
+              style={{ background: "radial-gradient(40% 40% at 50% 50%, rgba(0,255,136,0.10), transparent 70%)" }}
+            />
             <div className="relative z-10">
-              <Terminal className="w-12 h-12 text-neon-green mx-auto mb-6" />
               <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-4">
                 Give your agents real power, safely.
               </h2>
               <p className="text-lg text-text-secondary mb-8 max-w-lg mx-auto">
-                Free during beta. Open source. Self-hostable. Set up in 2 minutes.
+                Free during beta. Open source. Self-hostable. Set up in two minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <Link
@@ -449,11 +524,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ====== FOOTER ====== */}
+      {/* FOOTER */}
       <footer className="border-t border-void-300 py-8 px-6">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="font-mono text-sm text-text-muted">
-            <span className="text-neon-green">BLACKVAULT</span> — Built for the agent era.
+            <span className="text-neon-green">BLACKVAULT</span> — built for the agent era.
           </div>
           <div className="flex items-center gap-6 text-sm text-text-muted">
             <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">
