@@ -328,16 +328,16 @@ html.lenis, html.lenis body { height: auto; }
    ======================================== */
 .word { display: inline-block; }
 @keyframes word-rise {
-  from { opacity: 0; transform: translateY(0.6em) rotate(1.5deg); filter: blur(8px); }
+  from { opacity: 0; transform: translateY(0.9em) rotate(2deg) scale(0.96); filter: blur(12px); }
   to { opacity: 1; transform: none; filter: blur(0); }
 }
 @keyframes hero-rise-kf {
-  from { opacity: 0; transform: translateY(18px); }
+  from { opacity: 0; transform: translateY(22px); }
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .word { opacity: 0; animation: word-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .hero-rise { opacity: 0; animation: hero-rise-kf 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .word { opacity: 0; animation: word-rise 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .hero-rise { opacity: 0; animation: hero-rise-kf 0.8s cubic-bezier(0.16, 1, 0.3, 1) both; }
 }
 
 .grain::after {

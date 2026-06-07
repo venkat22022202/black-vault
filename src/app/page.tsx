@@ -19,11 +19,11 @@ import SmoothScroll from "@/components/smooth-scroll";
 
 // Hero headline split into reveal beats (1-3 words depending on length).
 const HERO_L1: { w: string; d: number }[] = [
-  { w: "Arm", d: 0 }, { w: "your", d: 0 }, { w: "AI", d: 0 }, { w: "agents.", d: 0.12 },
+  { w: "Arm", d: 0.05 }, { w: "your", d: 0.05 }, { w: "AI", d: 0.05 }, { w: "agents.", d: 0.28 },
 ];
 const HERO_L2: { w: string; d: number }[] = [
-  { w: "Never", d: 0.24 }, { w: "hand", d: 0.24 },
-  { w: "over", d: 0.36 }, { w: "the", d: 0.36 }, { w: "keys.", d: 0.48 },
+  { w: "Never", d: 0.5 }, { w: "hand", d: 0.5 },
+  { w: "over", d: 0.7 }, { w: "the", d: 0.7 }, { w: "keys.", d: 0.92 },
 ];
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
@@ -290,13 +290,13 @@ export default function LandingPage() {
 
           <p
             className="hero-rise mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed"
-            style={{ animationDelay: "0.64s" }}
+            style={{ animationDelay: "1.25s" }}
           >
             Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
             it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
           </p>
 
-          <div className="hero-rise mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "0.78s" }}>
+          <div className="hero-rise mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "1.45s" }}>
             <Link
               href="/sign-up"
               className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]"
@@ -315,7 +315,7 @@ export default function LandingPage() {
             </a>
           </div>
 
-          <div className="hero-rise mt-16" style={{ animationDelay: "0.92s" }}>
+          <div className="hero-rise mt-16" style={{ animationDelay: "1.65s" }}>
             <HeroTerminal />
           </div>
         </div>
