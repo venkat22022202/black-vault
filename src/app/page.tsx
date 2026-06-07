@@ -13,9 +13,18 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
+
+// Hero headline split into reveal beats (1-3 words depending on length).
+const HERO_L1: { w: string; d: number }[] = [
+  { w: "Arm", d: 0 }, { w: "your", d: 0 }, { w: "AI", d: 0 }, { w: "agents.", d: 0.12 },
+];
+const HERO_L2: { w: string; d: number }[] = [
+  { w: "Never", d: 0.24 }, { w: "hand", d: 0.24 },
+  { w: "over", d: 0.36 }, { w: "the", d: 0.36 }, { w: "keys.", d: 0.48 },
+];
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
@@ -253,22 +262,41 @@ export default function LandingPage() {
         />
 
         <div className="relative z-10 max-w-5xl mx-auto text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green">
+          <span
+            className="hero-rise inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green"
+            style={{ animationDelay: "0s" }}
+          >
             open source · MIT · credential firewall for AI agents
           </span>
 
           <h1 className="mt-8 font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95]">
-            Arm your AI agents.
-            <br />
-            <span className="text-gradient-green">Never hand over the keys.</span>
+            <span className="block">
+              {HERO_L1.map((it, i) => (
+                <Fragment key={`l1-${i}`}>
+                  <span className="word" style={{ animationDelay: `${it.d}s` }}>{it.w}</span>
+                  {i < HERO_L1.length - 1 ? " " : null}
+                </Fragment>
+              ))}
+            </span>
+            <span className="block">
+              {HERO_L2.map((it, i) => (
+                <Fragment key={`l2-${i}`}>
+                  <span className="word text-gradient-green" style={{ animationDelay: `${it.d}s` }}>{it.w}</span>
+                  {i < HERO_L2.length - 1 ? " " : null}
+                </Fragment>
+              ))}
+            </span>
           </h1>
 
-          <p className="mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed">
+          <p
+            className="hero-rise mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed"
+            style={{ animationDelay: "0.64s" }}
+          >
             Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
             it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
           </p>
 
-          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <div className="hero-rise mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "0.78s" }}>
             <Link
               href="/sign-up"
               className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]"
@@ -287,7 +315,7 @@ export default function LandingPage() {
             </a>
           </div>
 
-          <div className="mt-16">
+          <div className="hero-rise mt-16" style={{ animationDelay: "0.92s" }}>
             <HeroTerminal />
           </div>
         </div>

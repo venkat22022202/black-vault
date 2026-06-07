@@ -322,6 +322,24 @@ html.lenis, html.lenis body { height: auto; }
 /* Horizontal kinetic lines — transform driven by JS from real scroll position. */
 .hscroll-line { will-change: transform; }
 
+/* ========================================
+   HERO WORD CASCADE (on load, pure CSS, staggered beats)
+   Visible by default (reduced-motion / no anim) so it can't black out.
+   ======================================== */
+.word { display: inline-block; }
+@keyframes word-rise {
+  from { opacity: 0; transform: translateY(0.6em) rotate(1.5deg); filter: blur(8px); }
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+@keyframes hero-rise-kf {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .word { opacity: 0; animation: word-rise 0.75s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .hero-rise { opacity: 0; animation: hero-rise-kf 0.7s cubic-bezier(0.16, 1, 0.3, 1) both; }
+}
+
 .grain::after {
   content: "";
   position: absolute;
