@@ -37,7 +37,6 @@ curl -X DELETE https://black-vault-murex.vercel.app/api/egress/repos/you/app \\
   -H "Authorization: Bearer bvt_your_token"`;
 
 const SECRET_KEY = "sk-live-51H8aZ7pQxR3mN9kV";
-const SECRET_DOTS = "•".repeat(SECRET_KEY.length);
 const BVT_TOKEN = "bvt_3f9a2c8e4d";
 
 // ============================================
@@ -256,49 +255,51 @@ export default function LandingPage() {
       {/* MARQUEE */}
       <Marquee />
 
-      {/* CENTERPIECE 1 — Key -> Token: scroll seals the key into a token */}
-      <section className="relative h-[220vh] key-vault-track border-t border-void-300">
-        <div className="sticky top-0 h-screen flex flex-col items-center justify-center overflow-hidden grain px-6 text-center">
-          <div className="absolute inset-0 bg-grid opacity-25" />
-          <div
-            className="absolute -inset-40 animate-aurora opacity-40"
-            style={{ background: "radial-gradient(40% 40% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
-          />
-          <div className="relative z-10 w-full">
-            <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
+      {/* CENTERPIECE 1 — Key -> Token: the key recolors red->green (vaulted) on scroll */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-28 text-center border-t border-void-300">
+        <div className="absolute inset-0 bg-grid opacity-30" />
+        <div
+          className="absolute -inset-40 animate-aurora opacity-50"
+          style={{
+            background:
+              "radial-gradient(40% 40% at 50% 42%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 50% 62%, rgba(239,68,68,0.05), transparent 70%)",
+          }}
+        />
+        <div className="relative z-10 w-full">
+          <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
 
-            {/* the real key (red) overlaid by green dots that wipe across on scroll */}
-            <div className="relative inline-block">
-              <span className="block font-mono font-bold tracking-tight whitespace-nowrap text-neon-red text-[6vw] md:text-[4.4vw]">
-                {SECRET_KEY}
-              </span>
-              <span className="key-sealed block absolute inset-0 font-mono font-bold tracking-tight whitespace-nowrap text-neon-green text-[6vw] md:text-[4.4vw]">
-                {SECRET_DOTS}
-              </span>
-            </div>
+          <span className="key-sweep block w-max max-w-full mx-auto font-mono font-bold tracking-tight whitespace-nowrap text-[7vw] md:text-[4.6vw]">
+            {SECRET_KEY}
+          </span>
 
-            <div className="mt-14 flex flex-col items-center gap-4">
-              <span className="font-mono text-xs text-text-muted tracking-widest">VAULTED · ENCRYPTED · SCOPED ↓</span>
-              <div className="font-mono text-2xl md:text-4xl font-bold text-neon-green px-6 py-3 rounded-xl border border-neon-green/30 bg-neon-green/5 shadow-[0_0_30px_rgba(0,255,136,0.15)]">
-                {BVT_TOKEN}
-              </div>
-              <p className="text-text-secondary max-w-md mt-3 leading-relaxed">
-                The agent gets this token — never your key. Cap it, audit it, and revoke it in one click.
-              </p>
+          <div className="mt-14 flex flex-col items-center gap-4">
+            <span className="font-mono text-xs text-text-muted tracking-[0.3em]">VAULTED · ENCRYPTED · SCOPED ↓</span>
+            <div className="font-mono text-2xl md:text-4xl font-bold text-neon-green px-6 py-3 rounded-xl border border-neon-green/30 bg-neon-green/5 shadow-[0_0_30px_rgba(0,255,136,0.15)]">
+              {BVT_TOKEN}
             </div>
+            <p className="text-text-secondary max-w-md mt-3 leading-relaxed">
+              The agent gets this token — never your key. Cap it, audit it, and revoke it in one click.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* CENTERPIECE 2 — horizontal kinetic line (pinned, scrolls sideways) */}
-      <section className="relative h-[250vh] htrack border-t border-void-300">
-        <div className="sticky top-0 h-screen flex items-center overflow-hidden grain">
-          <div className="hscroll whitespace-nowrap w-max">
-            <span className="font-display font-bold tracking-tight leading-none text-[13vw] text-text-primary">
-              ONE KEY, VAULTED.&nbsp;&nbsp;
-              <span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
-              KILL IT IN ONE CLICK.&nbsp;&nbsp;
-              <span className="text-neon-green">ZERO BLAST RADIUS.</span>
+      {/* CENTERPIECE 2 — two counter-scrolling kinetic lines (pinned, fills the screen) */}
+      <section className="relative h-[150vh] htrack border-t border-void-300">
+        <div className="sticky top-0 h-screen flex flex-col justify-center gap-4 md:gap-8 overflow-hidden grain">
+          <div className="absolute inset-0 bg-grid opacity-25" />
+          <div
+            className="absolute -inset-40 animate-aurora opacity-40"
+            style={{ background: "radial-gradient(45% 45% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
+          />
+          <div className="hscroll-l whitespace-nowrap w-max relative z-10">
+            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-text-primary">
+              ONE KEY, VAULTED.&nbsp;&nbsp;<span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
+            </span>
+          </div>
+          <div className="hscroll-r whitespace-nowrap w-max relative z-10">
+            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-neon-green">
+              KILL IT IN ONE CLICK.&nbsp;&nbsp;ZERO BLAST RADIUS.&nbsp;&nbsp;
             </span>
           </div>
         </div>

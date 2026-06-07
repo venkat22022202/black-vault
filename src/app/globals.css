@@ -305,13 +305,13 @@ html.lenis, html.lenis body { height: auto; }
   inherits: false;
   initial-value: 100%;
 }
-.key-vault-track {
-  view-timeline-name: --vault;
-  view-timeline-axis: block;
-}
-.key-sealed {
-  /* reveal the green dots left->right: right inset shrinks as --sweep grows */
-  clip-path: inset(-25% calc(100% - var(--sweep)) -25% 0);
+/* One text element recolors red (exposed) -> green (vaulted) left->right on scroll.
+   Single element = perfect alignment, no overlay. */
+.key-sweep {
+  color: transparent;
+  background: linear-gradient(to right, #00ff88 var(--sweep), #ef4444 var(--sweep));
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 @keyframes key-seal {
   from { --sweep: 0%; }
@@ -319,11 +319,11 @@ html.lenis, html.lenis body { height: auto; }
 }
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .key-sealed {
+    .key-sweep {
       --sweep: 0%;
       animation: key-seal linear both;
-      animation-timeline: --vault;
-      animation-range: cover 15% cover 62%;
+      animation-timeline: view();
+      animation-range: entry 35% cover 48%;
     }
   }
 }
@@ -337,21 +337,27 @@ html.lenis, html.lenis body { height: auto; }
   view-timeline-name: --htrack;
   view-timeline-axis: block;
 }
-.hscroll {
-  transform: translateX(2vw);
-  will-change: transform;
-}
-@keyframes hscroll-move {
+.hscroll-l { transform: translateX(2vw); will-change: transform; }
+.hscroll-r { transform: translateX(calc(-100% + 92vw)); will-change: transform; }
+@keyframes hscroll-l {
   from { transform: translateX(2vw); }
   to { transform: translateX(calc(-100% + 92vw)); }
 }
+@keyframes hscroll-r {
+  from { transform: translateX(calc(-100% + 92vw)); }
+  to { transform: translateX(2vw); }
+}
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .hscroll {
-      animation: hscroll-move linear both;
+    .hscroll-l,
+    .hscroll-r {
       animation-timeline: --htrack;
-      animation-range: cover 8% cover 92%;
+      animation-range: cover 0% cover 100%;
+      animation-timing-function: linear;
+      animation-fill-mode: both;
     }
+    .hscroll-l { animation-name: hscroll-l; }
+    .hscroll-r { animation-name: hscroll-r; }
   }
 }
 
