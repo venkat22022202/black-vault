@@ -26,6 +26,13 @@ const HERO_L2: { w: string; d: number }[] = [
   { w: "over", d: 0.7 }, { w: "the", d: 0.7 }, { w: "keys.", d: 0.92 },
 ];
 
+// Horizontal scroll conveyor: each beat slides into center from the right while
+// the previous exits left (one continuous left-flow), scrubbed by scroll.
+const CONVEYOR: { t: string; g?: boolean }[] = [
+  { t: "Arm your AI" }, { t: "agents.", g: true },
+  { t: "Never hand" }, { t: "over the" }, { t: "keys.", g: true },
+];
+
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
 const MCP_CONFIG = `{
@@ -177,8 +184,7 @@ export default function LandingPage() {
   const keySecRef = useRef<HTMLElement>(null);
   const keyRef = useRef<HTMLSpanElement>(null);
   const hSecRef = useRef<HTMLElement>(null);
-  const l1Ref = useRef<HTMLDivElement>(null);
-  const l2Ref = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
 
   // Drive the key-sweep and horizontal lines from real scroll position (rAF).
   // Reliable with Lenis, and content is visible by default so it can't black out.
@@ -197,16 +203,13 @@ export default function LandingPage() {
       }
 
       const hs = hSecRef.current;
-      const l1 = l1Ref.current;
-      const l2 = l2Ref.current;
-      if (hs && l1 && l2) {
+      const track = trackRef.current;
+      if (hs && track) {
         const r = hs.getBoundingClientRect();
         const total = r.height - vh;
         const p = total > 0 ? clamp(-r.top / total) : 0;
-        const o1 = Math.max(0, l1.scrollWidth - window.innerWidth);
-        const o2 = Math.max(0, l2.scrollWidth - window.innerWidth);
-        l1.style.transform = `translateX(${(-p * o1).toFixed(1)}px)`;
-        l2.style.transform = `translateX(${(-(1 - p) * o2).toFixed(1)}px)`;
+        const steps = CONVEYOR.length - 1; // panels to traverse
+        track.style.transform = `translateX(${(-p * steps * window.innerWidth).toFixed(1)}px)`;
       }
 
       raf = requestAnimationFrame(loop);
@@ -360,23 +363,28 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CENTERPIECE 2 — two counter-scrolling kinetic lines (pinned, fills the screen) */}
-      <section ref={hSecRef} className="relative h-[150vh] border-t border-void-300">
-        <div className="sticky top-0 h-screen flex flex-col justify-center gap-4 md:gap-8 overflow-hidden grain">
+      {/* CENTERPIECE 2 — headline conveyor: each beat slides in from the right,
+          previous exits left, scrubbed by scroll (pinned) */}
+      <section ref={hSecRef} className="relative h-[380vh] border-t border-void-300">
+        <div className="sticky top-0 h-screen overflow-hidden grain">
           <div className="absolute inset-0 bg-grid opacity-25" />
           <div
             className="absolute -inset-40 animate-aurora opacity-40"
             style={{ background: "radial-gradient(45% 45% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
           />
-          <div ref={l1Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
-            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-text-primary">
-              ONE KEY, VAULTED.&nbsp;&nbsp;<span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
-            </span>
-          </div>
-          <div ref={l2Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
-            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-neon-green">
-              KILL IT IN ONE CLICK.&nbsp;&nbsp;ZERO BLAST RADIUS.&nbsp;&nbsp;
-            </span>
+          <div ref={trackRef} className="hscroll-line relative z-10 flex h-screen items-center">
+            {CONVEYOR.map((b, i) => (
+              <div key={i} className="shrink-0 w-screen flex items-center justify-center px-6 text-center">
+                <span
+                  className={cn(
+                    "font-display font-bold tracking-tight leading-none whitespace-nowrap text-[11vw]",
+                    b.g ? "text-gradient-green" : "text-text-primary"
+                  )}
+                >
+                  {b.t}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
