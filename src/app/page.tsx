@@ -13,27 +13,20 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
 
-// Hero headline split into reveal beats (1-3 words depending on length).
-const HERO_L1: { w: string; d: number }[] = [
-  { w: "Arm", d: 0.05 }, { w: "your", d: 0.05 }, { w: "AI", d: 0.05 }, { w: "agents.", d: 0.28 },
-];
-const HERO_L2: { w: string; d: number }[] = [
-  { w: "Never", d: 0.5 }, { w: "hand", d: 0.5 },
-  { w: "over", d: 0.7 }, { w: "the", d: 0.7 }, { w: "keys.", d: 0.92 },
-];
+const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
-// Horizontal scroll conveyor: each beat slides into center from the right while
-// the previous exits left (one continuous left-flow), scrubbed by scroll.
+// Section 1 — headline conveyor beats (slide in from right, exit left on scroll).
 const CONVEYOR: { t: string; g?: boolean }[] = [
   { t: "Arm your AI" }, { t: "agents.", g: true },
   { t: "Never hand" }, { t: "over the" }, { t: "keys.", g: true },
 ];
 
-const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
+const SECRET_KEY = "sk-live-51H8aZ7pQxR3mN9kV";
+const BVT_TOKEN = "bvt_3f9a2c8e4d";
 
 const MCP_CONFIG = `{
   "mcpServers": {
@@ -51,9 +44,6 @@ curl https://black-vault-murex.vercel.app/api/egress/user \\
 # prompt-injected misuse -> 403 blocked + audited
 curl -X DELETE https://black-vault-murex.vercel.app/api/egress/repos/you/app \\
   -H "Authorization: Bearer bvt_your_token"`;
-
-const SECRET_KEY = "sk-live-51H8aZ7pQxR3mN9kV";
-const BVT_TOKEN = "bvt_3f9a2c8e4d";
 
 // ============================================
 // COPYABLE CODE
@@ -81,7 +71,7 @@ function CopyableCode({ code }: { code: string }) {
 }
 
 // ============================================
-// HERO TERMINAL (typing log; visible frame even if JS is slow)
+// TERMINAL (typing log)
 // ============================================
 const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
   { s: "cmd", text: "agent -> blackvault -> api.github.com" },
@@ -97,7 +87,6 @@ function HeroTerminal() {
   useEffect(() => {
     let n = 0;
     const id = setInterval(() => {
-      // type up to all lines, hold ~3 ticks, then restart — setState only in callback
       n = n + 1 > terminalLines.length + 3 ? 0 : n + 1;
       setVisible(Math.min(n, terminalLines.length));
     }, 550);
@@ -140,7 +129,6 @@ const MARQUEE = [
   "OpenAI", "Anthropic", "Google", "Nebius", "Claude Desktop", "Cursor",
   "Cline", "LangChain", "CrewAI", "AutoGen", "GitHub", "Stripe",
 ];
-
 function Group() {
   return (
     <div className="flex shrink-0">
@@ -153,7 +141,6 @@ function Group() {
     </div>
   );
 }
-
 function Marquee() {
   return (
     <div className="overflow-hidden border-y border-void-300 py-6 mask-fade-x">
@@ -181,35 +168,53 @@ const features = [
 // PAGE
 // ============================================
 export default function LandingPage() {
+  const conveyorSecRef = useRef<HTMLElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const crossSecRef = useRef<HTMLElement>(null);
+  const l1Ref = useRef<HTMLDivElement>(null);
+  const l2Ref = useRef<HTMLDivElement>(null);
   const keySecRef = useRef<HTMLElement>(null);
   const keyRef = useRef<HTMLSpanElement>(null);
-  const hSecRef = useRef<HTMLElement>(null);
-  const trackRef = useRef<HTMLDivElement>(null);
 
-  // Drive the key-sweep and horizontal lines from real scroll position (rAF).
-  // Reliable with Lenis, and content is visible by default so it can't black out.
+  // All scroll effects driven from real scroll position (rAF) — reliable with Lenis.
   useEffect(() => {
     const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
     let raf = 0;
     const loop = () => {
       const vh = window.innerHeight;
 
+      // Section 1 — conveyor: slide track left as you scroll
+      const cs = conveyorSecRef.current;
+      const track = trackRef.current;
+      if (cs && track) {
+        const r = cs.getBoundingClientRect();
+        const total = r.height - vh;
+        const p = total > 0 ? clamp(-r.top / total) : 0;
+        const steps = CONVEYOR.length - 1;
+        track.style.transform = `translateX(${(-p * steps * window.innerWidth).toFixed(1)}px)`;
+      }
+
+      // Section 3 — two crossing lines
+      const xs = crossSecRef.current;
+      const l1 = l1Ref.current;
+      const l2 = l2Ref.current;
+      if (xs && l1 && l2) {
+        const r = xs.getBoundingClientRect();
+        const total = r.height - vh;
+        const p = total > 0 ? clamp(-r.top / total) : 0;
+        const o1 = Math.max(0, l1.scrollWidth - window.innerWidth);
+        const o2 = Math.max(0, l2.scrollWidth - window.innerWidth);
+        l1.style.transform = `translateX(${(-p * o1).toFixed(1)}px)`;
+        l2.style.transform = `translateX(${(-(1 - p) * o2).toFixed(1)}px)`;
+      }
+
+      // Key sweep (rest) — red -> green
       const ks = keySecRef.current;
       const k = keyRef.current;
       if (ks && k) {
         const r = ks.getBoundingClientRect();
         const p = clamp((vh - r.top) / (vh * 0.9));
         k.style.setProperty("--sweep", `${(p * 100).toFixed(1)}%`);
-      }
-
-      const hs = hSecRef.current;
-      const track = trackRef.current;
-      if (hs && track) {
-        const r = hs.getBoundingClientRect();
-        const total = r.height - vh;
-        const p = total > 0 ? clamp(-r.top / total) : 0;
-        const steps = CONVEYOR.length - 1; // panels to traverse
-        track.style.transform = `translateX(${(-p * steps * window.innerWidth).toFixed(1)}px)`;
       }
 
       raf = requestAnimationFrame(loop);
@@ -229,22 +234,14 @@ export default function LandingPage() {
             BLACKVAULT
           </Link>
           <div className="flex items-center gap-3 sm:gap-4">
-            <a
-              href={GITHUB_REPO}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-void-400 px-3 py-2 text-sm text-text-secondary hover:text-neon-green hover:border-neon-green/40 transition-colors"
-            >
+            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-void-400 px-3 py-2 text-sm text-text-secondary hover:text-neon-green hover:border-neon-green/40 transition-colors">
               <Star className="w-4 h-4" />
               <span className="hidden sm:inline">Star</span>
             </a>
             <Link href="/sign-in" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
               Sign In
             </Link>
-            <Link
-              href="/sign-up"
-              className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]"
-            >
+            <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]">
               Get Started
               <ArrowRight className="w-4 h-4" />
             </Link>
@@ -252,126 +249,20 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO — fully visible (no JS-gated opacity) */}
-      <section className="relative pt-32 pb-20 px-6 grain">
-        <div className="absolute inset-0 bg-grid opacity-40" />
-        <div className="absolute inset-0 bg-radial-fade" />
-        <div
-          className="absolute -inset-40 animate-aurora opacity-60"
-          style={{
-            background:
-              "radial-gradient(40% 40% at 30% 35%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 70% 60%, rgba(6,182,212,0.07), transparent 70%)",
-          }}
-        />
-
-        <div className="relative z-10 max-w-5xl mx-auto text-center">
-          <span
-            className="hero-rise inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green"
-            style={{ animationDelay: "0s" }}
-          >
-            open source · MIT · credential firewall for AI agents
-          </span>
-
-          <h1 className="mt-8 font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95]">
-            <span className="block">
-              {HERO_L1.map((it, i) => (
-                <Fragment key={`l1-${i}`}>
-                  <span className="word" style={{ animationDelay: `${it.d}s` }}>{it.w}</span>
-                  {i < HERO_L1.length - 1 ? " " : null}
-                </Fragment>
-              ))}
-            </span>
-            <span className="block">
-              {HERO_L2.map((it, i) => (
-                <Fragment key={`l2-${i}`}>
-                  <span className="word text-gradient-green" style={{ animationDelay: `${it.d}s` }}>{it.w}</span>
-                  {i < HERO_L2.length - 1 ? " " : null}
-                </Fragment>
-              ))}
-            </span>
-          </h1>
-
-          <p
-            className="hero-rise mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed"
-            style={{ animationDelay: "1.25s" }}
-          >
-            Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
-            it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
-          </p>
-
-          <div className="hero-rise mt-10 flex flex-col sm:flex-row items-center justify-center gap-4" style={{ animationDelay: "1.45s" }}>
-            <Link
-              href="/sign-up"
-              className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]"
-            >
-              Start free
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <a
-              href={GITHUB_REPO}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-3.5 text-base font-medium text-text-secondary hover:text-text-primary hover:border-void-500 transition-all"
-            >
-              <Star className="w-4 h-4" />
-              Star on GitHub
-            </a>
-          </div>
-
-          <div className="hero-rise mt-16" style={{ animationDelay: "1.65s" }}>
-            <HeroTerminal />
-          </div>
-        </div>
-      </section>
-
-      {/* MARQUEE */}
-      <Marquee />
-
-      {/* CENTERPIECE 1 — Key -> Token: the key recolors red->green (vaulted) on scroll */}
-      <section
-        ref={keySecRef}
-        className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-28 text-center border-t border-void-300"
-      >
-        <div className="absolute inset-0 bg-grid opacity-30" />
-        <div
-          className="absolute -inset-40 animate-aurora opacity-50"
-          style={{
-            background:
-              "radial-gradient(40% 40% at 50% 42%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 50% 62%, rgba(239,68,68,0.05), transparent 70%)",
-          }}
-        />
-        <div className="relative z-10 w-full">
-          <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
-
-          <span
-            ref={keyRef}
-            style={{ ["--sweep" as string]: "0%" }}
-            className="key-sweep block w-max max-w-full mx-auto font-mono font-bold tracking-tight whitespace-nowrap text-[7vw] md:text-[4.6vw]"
-          >
-            {SECRET_KEY}
-          </span>
-
-          <div className="mt-14 flex flex-col items-center gap-4">
-            <span className="font-mono text-xs text-text-muted tracking-[0.3em]">VAULTED · ENCRYPTED · SCOPED ↓</span>
-            <div className="font-mono text-2xl md:text-4xl font-bold text-neon-green px-6 py-3 rounded-xl border border-neon-green/30 bg-neon-green/5 shadow-[0_0_30px_rgba(0,255,136,0.15)]">
-              {BVT_TOKEN}
-            </div>
-            <p className="text-text-secondary max-w-md mt-3 leading-relaxed">
-              The agent gets this token — never your key. Cap it, audit it, and revoke it in one click.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* CENTERPIECE 2 — headline conveyor: each beat slides in from the right,
-          previous exits left, scrubbed by scroll (pinned) */}
-      <section ref={hSecRef} className="relative h-[380vh] border-t border-void-300">
+      {/* SECTION 1 — HEADLINE CONVEYOR (beats slide in from right, exit left) */}
+      <section ref={conveyorSecRef} className="relative h-[340vh]">
         <div className="sticky top-0 h-screen overflow-hidden grain">
-          <div className="absolute inset-0 bg-grid opacity-25" />
+          <div className="absolute inset-0 bg-grid opacity-40" />
+          <div className="absolute inset-0 bg-radial-fade" />
           <div
-            className="absolute -inset-40 animate-aurora opacity-40"
-            style={{ background: "radial-gradient(45% 45% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }}
+            className="absolute -inset-40 animate-aurora opacity-60"
+            style={{ background: "radial-gradient(40% 40% at 35% 40%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 70% 60%, rgba(6,182,212,0.07), transparent 70%)" }}
           />
+          <div className="absolute top-24 left-0 right-0 z-20 flex justify-center px-6">
+            <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green">
+              open source · MIT · credential firewall for AI agents
+            </span>
+          </div>
           <div ref={trackRef} className="hscroll-line relative z-10 flex h-screen items-center">
             {CONVEYOR.map((b, i) => (
               <div key={i} className="shrink-0 w-screen flex items-center justify-center px-6 text-center">
@@ -386,6 +277,80 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
+          <div className="absolute bottom-10 left-0 right-0 z-20 flex justify-center">
+            <span className="font-mono text-xs text-text-muted animate-pulse-glow rounded-full border border-void-400 px-3 py-1">
+              scroll ↓
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 2 — subtitle + buttons + terminal */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-24 border-t border-void-300">
+        <div className="absolute inset-0 bg-grid opacity-30" />
+        <div className="absolute inset-0 bg-radial-fade" />
+        <div className="relative z-10 max-w-5xl mx-auto text-center">
+          <p className="text-lg md:text-2xl text-text-secondary max-w-2xl mx-auto leading-relaxed">
+            Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
+            it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
+          </p>
+
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/sign-up" className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]">
+              Start free
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-3.5 text-base font-medium text-text-secondary hover:text-text-primary hover:border-void-500 transition-all">
+              <Star className="w-4 h-4" />
+              Star on GitHub
+            </a>
+          </div>
+
+          <div className="mt-16">
+            <HeroTerminal />
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 3 — two crossing lines */}
+      <section ref={crossSecRef} className="relative h-[150vh] border-t border-void-300">
+        <div className="sticky top-0 h-screen flex flex-col justify-center gap-4 md:gap-8 overflow-hidden grain">
+          <div className="absolute inset-0 bg-grid opacity-25" />
+          <div className="absolute -inset-40 animate-aurora opacity-40" style={{ background: "radial-gradient(45% 45% at 50% 50%, rgba(0,255,136,0.08), transparent 70%)" }} />
+          <div ref={l1Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
+            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-text-primary">
+              ONE KEY, VAULTED.&nbsp;&nbsp;<span className="text-gradient-green">A SCOPED TOKEN PER AGENT.</span>&nbsp;&nbsp;
+            </span>
+          </div>
+          <div ref={l2Ref} className="hscroll-line whitespace-nowrap w-max relative z-10">
+            <span className="font-display font-bold tracking-tight leading-none text-[12vw] text-neon-green">
+              KILL IT IN ONE CLICK.&nbsp;&nbsp;ZERO BLAST RADIUS.&nbsp;&nbsp;
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* MARQUEE */}
+      <Marquee />
+
+      {/* KEY -> TOKEN (rest, same) */}
+      <section ref={keySecRef} className="relative min-h-screen flex items-center justify-center overflow-hidden grain px-6 py-28 text-center border-t border-void-300">
+        <div className="absolute inset-0 bg-grid opacity-30" />
+        <div className="absolute -inset-40 animate-aurora opacity-50" style={{ background: "radial-gradient(40% 40% at 50% 42%, rgba(0,255,136,0.10), transparent 70%), radial-gradient(40% 40% at 50% 62%, rgba(239,68,68,0.05), transparent 70%)" }} />
+        <div className="relative z-10 w-full">
+          <div className="font-mono text-xs text-neon-green mb-12">{"// the key your agent never sees"}</div>
+          <span ref={keyRef} style={{ ["--sweep" as string]: "0%" }} className="key-sweep block w-max max-w-full mx-auto font-mono font-bold tracking-tight whitespace-nowrap text-[7vw] md:text-[4.6vw]">
+            {SECRET_KEY}
+          </span>
+          <div className="mt-14 flex flex-col items-center gap-4">
+            <span className="font-mono text-xs text-text-muted tracking-[0.3em]">VAULTED · ENCRYPTED · SCOPED ↓</span>
+            <div className="font-mono text-2xl md:text-4xl font-bold text-neon-green px-6 py-3 rounded-xl border border-neon-green/30 bg-neon-green/5 shadow-[0_0_30px_rgba(0,255,136,0.15)]">
+              {BVT_TOKEN}
+            </div>
+            <p className="text-text-secondary max-w-md mt-3 leading-relaxed">
+              The agent gets this token — never your key. Cap it, audit it, and revoke it in one click.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -398,7 +363,6 @@ export default function LandingPage() {
               The guardrails agents were missing.
             </h2>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-void-300 border border-void-300 rounded-xl overflow-hidden">
             {features.map((f, i) => (
               <div key={f.title} className="group relative bg-void-50 p-7 hover:bg-void-100 transition-colors reveal">
@@ -428,7 +392,6 @@ export default function LandingPage() {
               broker any API key over HTTP. Your config holds the token, never your real key.
             </p>
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 reveal">
             <div>
               <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-text-primary">
@@ -489,10 +452,7 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto text-center reveal">
           <div className="relative rounded-2xl border border-void-300 bg-void-50 p-12 md:p-16 overflow-hidden grain">
             <div className="absolute inset-0 bg-radial-fade opacity-60" />
-            <div
-              className="absolute -inset-40 animate-aurora opacity-40"
-              style={{ background: "radial-gradient(40% 40% at 50% 50%, rgba(0,255,136,0.10), transparent 70%)" }}
-            />
+            <div className="absolute -inset-40 animate-aurora opacity-40" style={{ background: "radial-gradient(40% 40% at 50% 50%, rgba(0,255,136,0.10), transparent 70%)" }} />
             <div className="relative z-10">
               <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight mb-4">
                 Give your agents real power, safely.
@@ -501,19 +461,11 @@ export default function LandingPage() {
                 Free during beta. Open source. Self-hostable. Set up in two minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link
-                  href="/sign-up"
-                  className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-4 text-lg font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_40px_rgba(0,255,136,0.4)]"
-                >
+                <Link href="/sign-up" className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-4 text-lg font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_40px_rgba(0,255,136,0.4)]">
                   Start free
                   <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <a
-                  href={GITHUB_REPO}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-4 text-lg font-medium text-text-secondary hover:text-text-primary transition-all"
-                >
+                <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-4 text-lg font-medium text-text-secondary hover:text-text-primary transition-all">
                   <Star className="w-5 h-5" />
                   Star on GitHub
                 </a>
@@ -530,15 +482,9 @@ export default function LandingPage() {
             <span className="text-neon-green">BLACKVAULT</span> — built for the agent era.
           </div>
           <div className="flex items-center gap-6 text-sm text-text-muted">
-            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">
-              GitHub
-            </a>
-            <Link href="/terms" className="hover:text-text-primary transition-colors">
-              Terms
-            </Link>
-            <Link href="/privacy" className="hover:text-text-primary transition-colors">
-              Privacy
-            </Link>
+            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="hover:text-text-primary transition-colors">GitHub</a>
+            <Link href="/terms" className="hover:text-text-primary transition-colors">Terms</Link>
+            <Link href="/privacy" className="hover:text-text-primary transition-colors">Privacy</Link>
           </div>
         </div>
       </footer>
