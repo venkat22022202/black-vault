@@ -326,6 +326,27 @@ html.lenis, html.lenis body { height: auto; }
    HERO WORD CASCADE (on load, pure CSS, staggered beats)
    Visible by default (reduced-motion / no anim) so it can't black out.
    ======================================== */
+/* ========================================
+   DESIGN-ENG TOKENS (Emil Kowalski) — strong easing + tactile press
+   ======================================== */
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+/* Pressable elements get instant tactile feedback (transform only = GPU). */
+.press {
+  transition: transform 0.16s var(--ease-out);
+}
+.press:active {
+  transform: scale(0.97);
+}
+@media (prefers-reduced-motion: reduce) {
+  .press:active {
+    transform: none;
+  }
+}
+
 .word { display: inline-block; }
 @keyframes word-rise {
   from { opacity: 0; transform: translateY(0.9em) rotate(2deg) scale(0.96); filter: blur(12px); }

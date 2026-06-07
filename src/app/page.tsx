@@ -16,6 +16,8 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
+import TiltCard from "@/components/tilt-card";
+import Magnetic from "@/components/magnetic";
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
@@ -256,7 +258,7 @@ export default function LandingPage() {
             <Link href="/sign-in" className="text-sm text-text-secondary hover:text-text-primary transition-colors">
               Sign In
             </Link>
-            <Link href="/sign-up" className="inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]">
+            <Link href="/sign-up" className="press inline-flex items-center gap-2 rounded-lg bg-neon-green px-4 py-2 text-sm font-semibold text-black hover:bg-neon-green/90 hover:shadow-[0_0_20px_rgba(0,255,136,0.3)]">
               Get Started
               <ArrowRight className="w-4 h-4" />
             </Link>
@@ -310,19 +312,23 @@ export default function LandingPage() {
           </p>
 
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link href="/sign-up" className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]">
-              Start free
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-3.5 text-base font-medium text-text-secondary hover:text-text-primary hover:border-void-500 transition-all">
-              <Star className="w-4 h-4" />
-              Star on GitHub
-            </a>
+            <Magnetic>
+              <Link href="/sign-up" className="press group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]">
+                Start free
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </Magnetic>
+            <Magnetic>
+              <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="press inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-3.5 text-base font-medium text-text-secondary hover:text-text-primary hover:border-void-500">
+                <Star className="w-4 h-4" />
+                Star on GitHub
+              </a>
+            </Magnetic>
           </div>
 
-          <div className="mt-16">
+          <TiltCard className="mt-16 w-full max-w-3xl mx-auto">
             <HeroTerminal />
-          </div>
+          </TiltCard>
         </div>
       </section>
 
@@ -475,14 +481,18 @@ export default function LandingPage() {
                 Free during beta. Open source. Self-hostable. Set up in two minutes.
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link href="/sign-up" className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-4 text-lg font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_40px_rgba(0,255,136,0.4)]">
-                  Start free
-                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-                <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-4 text-lg font-medium text-text-secondary hover:text-text-primary transition-all">
-                  <Star className="w-5 h-5" />
-                  Star on GitHub
-                </a>
+                <Magnetic>
+                  <Link href="/sign-up" className="press group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-4 text-lg font-semibold text-black hover:bg-neon-green/90 hover:shadow-[0_0_40px_rgba(0,255,136,0.4)]">
+                    Start free
+                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Magnetic>
+                <Magnetic>
+                  <a href={GITHUB_REPO} target="_blank" rel="noopener noreferrer" className="press inline-flex items-center gap-2 rounded-lg border border-void-400 px-8 py-4 text-lg font-medium text-text-secondary hover:text-text-primary">
+                    <Star className="w-5 h-5" />
+                    Star on GitHub
+                  </a>
+                </Magnetic>
               </div>
             </div>
           </div>
