@@ -192,16 +192,18 @@ export default function LandingPage() {
         const p = total > 0 ? clamp(-r.top / total) : 0;
         const steps = CONVEYOR.length - 1;
         const active = p * steps; // fractional index of the centered beat
-        track.style.transform = `translateX(${(-active * window.innerWidth).toFixed(1)}px)`;
-        // Depth: right (upcoming) = bigger, center = full size, left (past) = small + faded + blurred
+        const spacing = window.innerWidth * 0.46; // distance between adjacent beats
+        // Each beat is absolutely centered, offset by its distance from `active`,
+        // scaled big(right)->normal(center)->small(left), faded + blurred at the edges.
         const kids = track.children;
         for (let i = 0; i < kids.length; i++) {
-          const n = i - active; // panel offset from center, in panel-widths
-          const scale = clamp(1 + n * 0.3, 0.55, 1.4);
-          const opacity = clamp(1 - Math.abs(n) * 0.55, 0, 1);
-          const blur = Math.min(Math.abs(n) * 3, 6);
+          const n = i - active;
+          const x = n * spacing;
+          const scale = clamp(1 + n * 0.32, 0.5, 1.55);
+          const opacity = clamp(1 - Math.abs(n) * 0.85, 0, 1);
+          const blur = Math.min(Math.abs(n) * 2, 5);
           const el = kids[i] as HTMLElement;
-          el.style.transform = `scale(${scale.toFixed(3)})`;
+          el.style.transform = `translate(calc(-50% + ${x.toFixed(1)}px), -50%) scale(${scale.toFixed(3)})`;
           el.style.opacity = opacity.toFixed(3);
           el.style.filter = `blur(${blur.toFixed(1)}px)`;
         }
@@ -276,18 +278,17 @@ export default function LandingPage() {
               open source · MIT · credential firewall for AI agents
             </span>
           </div>
-          <div ref={trackRef} className="hscroll-line relative z-10 flex h-screen items-center">
+          <div ref={trackRef} className="relative z-10 h-screen">
             {CONVEYOR.map((b, i) => (
-              <div key={i} className="shrink-0 w-screen flex items-center justify-center px-6 text-center will-change-transform">
-                <span
-                  className={cn(
-                    "font-display font-bold tracking-tight leading-none whitespace-nowrap text-[11vw]",
-                    b.g ? "text-gradient-green" : "text-text-primary"
-                  )}
-                >
-                  {b.t}
-                </span>
-              </div>
+              <span
+                key={i}
+                className={cn(
+                  "absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap will-change-transform font-display font-bold tracking-tight leading-none text-[11vw]",
+                  b.g ? "text-gradient-green" : "text-text-primary"
+                )}
+              >
+                {b.t}
+              </span>
             ))}
           </div>
           <div className="absolute bottom-10 left-0 right-0 z-20 flex justify-center">
