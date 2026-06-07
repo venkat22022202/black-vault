@@ -349,15 +349,16 @@ html.lenis, html.lenis body { height: auto; }
 }
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    .hscroll-l,
-    .hscroll-r {
+    .hscroll-l {
+      animation: hscroll-l linear both;
       animation-timeline: --htrack;
       animation-range: cover 0% cover 100%;
-      animation-timing-function: linear;
-      animation-fill-mode: both;
     }
-    .hscroll-l { animation-name: hscroll-l; }
-    .hscroll-r { animation-name: hscroll-r; }
+    .hscroll-r {
+      animation: hscroll-r linear both;
+      animation-timeline: --htrack;
+      animation-range: cover 0% cover 100%;
+    }
   }
 }
 
