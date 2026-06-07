@@ -554,7 +554,7 @@ export default function DashboardPage() {
           <Link
             key={action.label}
             href={action.href}
-            className="group flex items-center justify-between rounded-xl border border-void-300 bg-void-50 p-4 hover:border-void-400 hover:bg-void-100 transition-all"
+            className="lift group flex items-center justify-between rounded-xl border border-void-300 bg-void-50 p-4 hover:border-void-400 hover:bg-void-100"
           >
             <div className="flex items-center gap-3">
               <action.icon className="w-5 h-5 text-text-muted group-hover:text-neon-green transition-colors" />

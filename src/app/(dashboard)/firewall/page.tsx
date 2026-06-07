@@ -171,7 +171,7 @@ function CreateTargetModal({ onClose }: { onClose: () => void }) {
           <button
             onClick={submit}
             disabled={create.isPending}
-            className="flex-1 rounded-lg bg-neon-green py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="press flex-1 rounded-lg bg-neon-green py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {create.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
             Create target
@@ -327,6 +327,8 @@ function TargetCard({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -4 }}
+      transition={{ type: "spring", stiffness: 350, damping: 28 }}
       className="rounded-xl border border-void-300 bg-void-50 p-5 glass-hover"
     >
       <div className="flex items-start justify-between">
@@ -362,7 +364,7 @@ function TargetCard({
         <span className="text-[10px] font-mono text-text-muted">secret {target.keyPrefix} · encrypted</span>
         <button
           onClick={onMint}
-          className="ml-auto rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-1.5 text-xs font-semibold text-neon-cyan hover:bg-neon-cyan/20 flex items-center gap-1.5"
+          className="press ml-auto rounded-lg border border-neon-cyan/40 bg-neon-cyan/10 px-3 py-1.5 text-xs font-semibold text-neon-cyan hover:bg-neon-cyan/20 flex items-center gap-1.5"
         >
           <KeyRound className="w-3.5 h-3.5" />
           Mint token
@@ -440,7 +442,7 @@ export default function FirewallPage() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 flex items-center gap-2 shrink-0"
+          className="press rounded-lg bg-neon-green px-4 py-2.5 text-sm font-semibold text-black hover:bg-neon-green/90 flex items-center gap-2 shrink-0"
         >
           <Plus className="w-4 h-4" />
           New target

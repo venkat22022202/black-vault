@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
 import TiltCard from "@/components/tilt-card";
 import Magnetic from "@/components/magnetic";
+import Spotlight from "@/components/spotlight";
 
 const GITHUB_REPO = "https://github.com/venkat22022202/black-vault";
 
@@ -243,6 +244,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-void-0 overflow-x-clip">
       <SmoothScroll />
+      <Spotlight />
 
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-50 glass">

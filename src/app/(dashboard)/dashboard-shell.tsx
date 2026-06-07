@@ -70,7 +70,7 @@ export default function DashboardShell({
             href={GITHUB_REPO}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-neon-green hover:border-neon-green/40 transition-colors"
+            className="press flex items-center gap-1.5 rounded-lg border border-void-300 bg-void-100 px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-neon-green hover:border-neon-green/40"
           >
             <Star className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Star on GitHub</span>
@@ -105,7 +105,7 @@ export default function DashboardShell({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all",
+                  "press flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium",
                   isActive
                     ? "bg-neon-green/10 text-neon-green"
                     : "text-text-secondary hover:text-text-primary hover:bg-void-200"

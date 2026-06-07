@@ -341,8 +341,18 @@ html.lenis, html.lenis body { height: auto; }
 .press:active {
   transform: scale(0.97);
 }
+/* Subtle hover-lift for cards (crisp dashboard mood, not bouncy). */
+.lift {
+  transition: transform 0.2s var(--ease-out), border-color 0.2s var(--ease-out), background-color 0.2s var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    transform: translateY(-3px);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .press:active {
+  .press:active,
+  .lift:hover {
     transform: none;
   }
 }
