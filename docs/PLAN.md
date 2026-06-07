@@ -70,6 +70,20 @@ See [`design/0002-mcp-credential-broker.md`](./design/0002-mcp-credential-broker
 - [ ] **Increment 3** — proxy upstream remote MCP servers with injected creds +
       per-token tool allowlist.
 
+### Phase 1.5 — Proving Ground 🚧 (the growth bet)
+
+"Don't trust your agent security — prove it." A closed loop nobody else offers:
+scan an agent/MCP/token setup against the OWASP Agentic Top 10, auto-generate the
+BlackVault policy that blocks each finding, re-run to prove it, emit an A–F score
++ a "Hardened by BlackVault" badge. The crowded market is split between red-team
+tools and firewalls; this *closes the loop*. See
+[`design/0004-proving-ground.md`](./design/0004-proving-ground.md).
+
+- [x] Core engine — attack catalog (ASI-mapped) + run/score/harden/re-prove, pure + tested.
+- [ ] tRPC `provingGround.scan` + `/proving-ground` dashboard page (run → grade → apply policy).
+- [ ] `npx blackvault scan` CLI + shareable SVG badge endpoint (the viral hook).
+- [ ] Live-probe runner (drive a real agent/MCP) + community attack/defense plugins.
+
 ### Phase 2 — Observability & trust
 
 - [ ] Usage analytics dashboard (cost / latency / tokens over time).
@@ -96,7 +110,8 @@ See [`design/0002-mcp-credential-broker.md`](./design/0002-mcp-credential-broker
 |---|---|---|
 | [0001](./design/0001-core-hardening.md) | Core hardening (budget · tools · tests/CI) | ✅ Implemented |
 | [0002](./design/0002-mcp-credential-broker.md) | MCP credential broker | ✅ Inc 1 implemented |
-| [0003](./design/0003-egress-firewall.md) | Egress firewall (agent credential firewall) | 🚧 Policy engine implemented |
+| [0003](./design/0003-egress-firewall.md) | Egress firewall (agent credential firewall) | 🚧 Policy engine + route implemented |
+| [0004](./design/0004-proving-ground.md) | Proving Ground (attack → harden → prove + score) | 🚧 Core engine implemented |
 
 ---
 
