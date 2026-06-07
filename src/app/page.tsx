@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useScroll, useTransform } from "framer-motion";
 import {
   Lock,
   ShieldCheck,
@@ -14,7 +13,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import SmoothScroll from "@/components/smooth-scroll";
 
@@ -63,7 +62,7 @@ function CopyableCode({ code }: { code: string }) {
 }
 
 // ============================================
-// HERO TERMINAL (asset-free, monochrome status dots)
+// HERO TERMINAL (typing log; visible frame even if JS is slow)
 // ============================================
 const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
   { s: "cmd", text: "agent -> blackvault -> api.github.com" },
@@ -75,11 +74,12 @@ const terminalLines: { s: "cmd" | "ok" | "block"; text: string }[] = [
 ];
 
 function HeroTerminal() {
-  const [visible, setVisible] = useState(0);
-  const cycle = visible === 0;
+  const [visible, setVisible] = useState(terminalLines.length);
+  const cycle = visible >= terminalLines.length;
   useEffect(() => {
-    const timers = terminalLines.map((_, i) => setTimeout(() => setVisible(i + 1), 500 + i * 700));
-    const restart = setTimeout(() => setVisible(0), 500 + terminalLines.length * 700 + 1800);
+    setVisible(0);
+    const timers = terminalLines.map((_, i) => setTimeout(() => setVisible(i + 1), 400 + i * 650));
+    const restart = setTimeout(() => setVisible(terminalLines.length), 400 + terminalLines.length * 650 + 2200);
     return () => {
       timers.forEach(clearTimeout);
       clearTimeout(restart);
@@ -97,27 +97,16 @@ function HeroTerminal() {
         </div>
         <div className="p-4 font-mono text-[11px] sm:text-[13px] leading-relaxed min-h-[210px]">
           {terminalLines.slice(0, visible).map((line, i) => (
-            <motion.div
-              key={i}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex items-center gap-2 whitespace-nowrap"
-            >
+            <div key={i} className="flex items-center gap-2 whitespace-nowrap animate-fade-in">
               {line.s === "cmd" ? (
                 <span className="text-text-muted">$ {line.text}</span>
               ) : (
                 <>
-                  <span
-                    className={cn(
-                      "w-1.5 h-1.5 rounded-full shrink-0",
-                      line.s === "ok" ? "bg-neon-green" : "bg-neon-red"
-                    )}
-                  />
+                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", line.s === "ok" ? "bg-neon-green" : "bg-neon-red")} />
                   <span className={line.s === "ok" ? "text-text-secondary" : "text-neon-red"}>{line.text}</span>
                 </>
               )}
-            </motion.div>
+            </div>
           ))}
           <span className="inline-block w-2 h-4 bg-neon-green ml-1 align-middle animate-terminal-blink" />
         </div>
@@ -159,95 +148,7 @@ function Marquee() {
 }
 
 // ============================================
-// SCROLL-SCRUBBED FIREWALL BEAT
-// ============================================
-function FirewallScroll() {
-  const ref = useRef<HTMLDivElement>(null);
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-
-  const barH = useTransform(scrollYProgress, [0, 1], ["0%", "100%"]);
-  const monOpacity = useTransform(scrollYProgress, [0.4, 0.5], [1, 0]);
-  const enfOpacity = useTransform(scrollYProgress, [0.5, 0.62], [0, 1]);
-  const summaryOpacity = useTransform(scrollYProgress, [0.8, 0.94], [0, 1]);
-
-  const o1 = useTransform(scrollYProgress, [0.06, 0.16], [0, 1]);
-  const x1 = useTransform(scrollYProgress, [0.06, 0.16], [-24, 0]);
-  const o2 = useTransform(scrollYProgress, [0.22, 0.32], [0, 1]);
-  const x2 = useTransform(scrollYProgress, [0.22, 0.32], [-24, 0]);
-  const o3 = useTransform(scrollYProgress, [0.44, 0.54], [0, 1]);
-  const x3 = useTransform(scrollYProgress, [0.44, 0.54], [-24, 0]);
-  const o4 = useTransform(scrollYProgress, [0.62, 0.72], [0, 1]);
-  const x4 = useTransform(scrollYProgress, [0.62, 0.72], [-24, 0]);
-
-  const rows = [
-    { o: o1, x: x1, ok: true, method: "GET", path: "/repos/octocat/app", note: "200 · key injected server-side" },
-    { o: o2, x: x2, ok: true, method: "GET", path: "/user", note: "200 · allowed by policy" },
-    { o: o3, x: x3, ok: false, method: "POST", path: "attacker.com", note: "blocked · host not pinned" },
-    { o: o4, x: x4, ok: false, method: "DELETE", path: "/repos/octocat/app", note: "403 · method not allowed" },
-  ];
-
-  return (
-    <section ref={ref} className="relative h-[280vh] border-t border-void-300">
-      <div className="sticky top-0 h-screen flex items-center overflow-hidden grain">
-        <div className="absolute inset-0 bg-grid opacity-30" />
-        <div
-          className="absolute -inset-40 animate-aurora opacity-50"
-          style={{
-            background:
-              "radial-gradient(40% 40% at 35% 40%, rgba(239,68,68,0.08), transparent 70%), radial-gradient(40% 40% at 65% 55%, rgba(0,255,136,0.08), transparent 70%)",
-          }}
-        />
-        <div className="relative z-10 w-full max-w-5xl mx-auto px-6 grid lg:grid-cols-[1fr_1.15fr] gap-10 items-center">
-          {/* Left: narrative */}
-          <div>
-            <div className="font-mono text-xs text-neon-green mb-4">{"// the firewall, live"}</div>
-            <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight leading-[1.05]">
-              Prompt-inject it
-              <br />
-              all you want.
-            </h2>
-            <div className="relative h-9 mt-6">
-              <motion.div style={{ opacity: monOpacity }} className="absolute font-mono text-xl text-text-muted">
-                status: MONITORING
-              </motion.div>
-              <motion.div style={{ opacity: enfOpacity }} className="absolute font-mono text-xl text-neon-red">
-                status: ENFORCED
-              </motion.div>
-            </div>
-            <motion.p style={{ opacity: summaryOpacity }} className="mt-6 text-text-secondary max-w-md leading-relaxed">
-              The secret never leaves the vault. The host is pinned. The policy is law. The agent gets exactly what you
-              allow — nothing more.
-            </motion.p>
-          </div>
-
-          {/* Right: scrubbed log */}
-          <div className="relative rounded-2xl border border-void-300 bg-void-50/80 backdrop-blur p-5 pl-6">
-            <motion.div style={{ height: barH }} className="absolute left-0 top-0 w-[2px] bg-neon-green" />
-            <div className="font-mono text-xs text-text-muted mb-5">agent → blackvault → upstream</div>
-            <div className="space-y-3">
-              {rows.map((r, i) => (
-                <motion.div key={i} style={{ opacity: r.o, x: r.x }} className="font-mono text-xs">
-                  <div className="flex items-center gap-3">
-                    <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", r.ok ? "bg-neon-green" : "bg-neon-red")} />
-                    <span className={cn("w-16 shrink-0", r.ok ? "text-text-secondary" : "text-neon-red")}>{r.method}</span>
-                    <span className="text-text-muted flex-1 truncate">{r.path}</span>
-                    <span className={cn("shrink-0 font-semibold", r.ok ? "text-neon-green" : "text-neon-red")}>
-                      {r.ok ? "ALLOW" : "BLOCK"}
-                    </span>
-                  </div>
-                  <div className="pl-[1.625rem] text-[10px] text-text-muted/70 mt-0.5">{r.note}</div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ============================================
-// FEATURES (editorial cards, no icon-boxes)
+// FEATURES
 // ============================================
 const features = [
   { icon: ShieldCheck, title: "Egress Firewall", desc: "Give an agent your GitHub / Stripe / DB key through a scoped token. Host pinned, methods and paths allowlisted, secret injected server-side." },
@@ -296,7 +197,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO */}
+      {/* HERO — fully visible (no JS-gated opacity) */}
       <section className="relative pt-32 pb-20 px-6 grain">
         <div className="absolute inset-0 bg-grid opacity-40" />
         <div className="absolute inset-0 bg-radial-fade" />
@@ -309,39 +210,22 @@ export default function LandingPage() {
         />
 
         <div className="relative z-10 max-w-5xl mx-auto text-center">
-          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-            <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green">
-              open source · MIT · credential firewall for AI agents
-            </span>
-          </motion.div>
+          <span className="inline-flex items-center gap-2 rounded-full border border-neon-green/30 bg-neon-green/5 px-4 py-1.5 text-xs font-mono text-neon-green">
+            open source · MIT · credential firewall for AI agents
+          </span>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.08 }}
-            className="mt-8 font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95]"
-          >
+          <h1 className="mt-8 font-display text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight leading-[0.95]">
             Arm your AI agents.
             <br />
             <span className="text-gradient-green">Never hand over the keys.</span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.16 }}
-            className="mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed"
-          >
+          <p className="mt-6 text-lg md:text-xl text-text-secondary max-w-2xl mx-auto leading-relaxed">
             Vault the secret. Hand the agent a scoped <span className="font-mono text-neon-green">bvt_</span> token. Cap
             it, audit it, kill it in one click — and even prompt-injected, it cannot steal the key or misuse it.
-          </motion.p>
+          </p>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, delay: 0.24 }}
-            className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4"
-          >
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/sign-up"
               className="group inline-flex items-center gap-2 rounded-lg bg-neon-green px-8 py-3.5 text-base font-semibold text-black hover:bg-neon-green/90 transition-all hover:shadow-[0_0_30px_rgba(0,255,136,0.4)]"
@@ -358,29 +242,42 @@ export default function LandingPage() {
               <Star className="w-4 h-4" />
               Star on GitHub
             </a>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.7, delay: 0.4 }}
-            className="mt-16"
-          >
+          <div className="mt-16">
             <HeroTerminal />
-          </motion.div>
+          </div>
         </div>
       </section>
 
       {/* MARQUEE */}
       <Marquee />
 
-      {/* SCROLL-SCRUBBED FIREWALL */}
-      <FirewallScroll />
+      {/* BATTERY-FILL CENTERPIECE — scroll fills AIRTIGHT bottom-up */}
+      <section className="relative h-[200vh] battery-track border-t border-void-300">
+        <div className="sticky top-0 h-screen flex flex-col items-center justify-center overflow-hidden grain px-6 text-center">
+          <div className="absolute inset-0 bg-grid opacity-25" />
+          <div
+            className="absolute -inset-40 animate-aurora opacity-40"
+            style={{ background: "radial-gradient(40% 40% at 50% 55%, rgba(0,255,136,0.08), transparent 70%)" }}
+          />
+          <div className="relative z-10">
+            <div className="font-mono text-xs text-neon-green mb-6">{"// blast radius -> zero"}</div>
+            <h2 className="fill-text font-display font-bold tracking-tight leading-none text-[22vw] md:text-[17vw]">
+              AIRTIGHT
+            </h2>
+            <p className="mt-6 text-text-secondary max-w-xl mx-auto leading-relaxed">
+              Hand an agent a real credential. It works — but the secret never leaks, the host is pinned, and misuse is
+              blocked. Scroll sealed it; nothing else gets through.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* FEATURES */}
       <section id="features" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-7xl mx-auto">
-          <div className="mb-14">
+          <div className="mb-14 reveal">
             <div className="font-mono text-xs text-neon-green mb-3">{"// what ships"}</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight max-w-2xl">
               The guardrails agents were missing.
@@ -389,14 +286,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-px bg-void-300 border border-void-300 rounded-xl overflow-hidden">
             {features.map((f, i) => (
-              <motion.div
-                key={f.title}
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.5, delay: (i % 3) * 0.06 }}
-                className="group relative bg-void-50 p-7 hover:bg-void-100 transition-colors"
-              >
+              <div key={f.title} className="group relative bg-void-50 p-7 hover:bg-void-100 transition-colors reveal">
                 <div className="absolute top-0 left-0 h-px w-full bg-gradient-to-r from-neon-green/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                 <div className="flex items-center justify-between mb-5">
                   <span className="font-mono text-xs text-text-muted">0{i + 1}</span>
@@ -404,7 +294,7 @@ export default function LandingPage() {
                 </div>
                 <h3 className="text-lg font-semibold text-text-primary mb-2">{f.title}</h3>
                 <p className="text-sm text-text-secondary leading-relaxed">{f.desc}</p>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -413,7 +303,7 @@ export default function LandingPage() {
       {/* DROP-IN SETUP */}
       <section id="connect" className="py-24 px-6 border-t border-void-300">
         <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-12 reveal">
             <div className="font-mono text-xs text-neon-green mb-3">{"// drop-in setup"}</div>
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
               Connect in <span className="text-gradient-green">30 seconds</span>.
@@ -424,7 +314,7 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 reveal">
             <div>
               <div className="flex items-center gap-2 mb-3 text-sm font-semibold text-text-primary">
                 <Plug className="w-4 h-4 text-neon-cyan" />
@@ -454,7 +344,7 @@ export default function LandingPage() {
       {/* HOW IT WORKS */}
       <section className="py-24 px-6 border-t border-void-300">
         <div className="max-w-4xl mx-auto">
-          <div className="text-center mb-16">
+          <div className="text-center mb-16 reveal">
             <h2 className="font-display text-4xl md:text-5xl font-bold tracking-tight">
               Three steps. <span className="text-gradient-green">Zero blast radius.</span>
             </h2>
@@ -464,15 +354,8 @@ export default function LandingPage() {
               { step: "01", title: "Vault the secret", desc: "Add an API key or credential. Encrypted with AES-256-GCM using a per-key derived key — and never returned to the agent." },
               { step: "02", title: "Mint a scoped token", desc: "Generate a bvt_ token per agent with a policy: allowed hosts, methods and paths, a budget cap, and rate limits." },
               { step: "03", title: "Ship it safely", desc: "The agent works through the token — it cannot see, steal, or misuse the secret. Every call is audited; one click kills it." },
-            ].map((item, i) => (
-              <motion.div
-                key={item.step}
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.12 }}
-                className="flex gap-6 items-start"
-              >
+            ].map((item) => (
+              <div key={item.step} className="flex gap-6 items-start reveal">
                 <div className="shrink-0 w-14 h-14 rounded-xl border border-void-400 bg-void-100 flex items-center justify-center">
                   <span className="font-mono text-lg font-bold text-neon-green">{item.step}</span>
                 </div>
@@ -480,7 +363,7 @@ export default function LandingPage() {
                   <h3 className="text-xl font-semibold text-text-primary mb-1">{item.title}</h3>
                   <p className="text-text-secondary leading-relaxed">{item.desc}</p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
@@ -488,7 +371,7 @@ export default function LandingPage() {
 
       {/* CTA */}
       <section className="py-24 px-6 border-t border-void-300">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-4xl mx-auto text-center reveal">
           <div className="relative rounded-2xl border border-void-300 bg-void-50 p-12 md:p-16 overflow-hidden grain">
             <div className="absolute inset-0 bg-radial-fade opacity-60" />
             <div

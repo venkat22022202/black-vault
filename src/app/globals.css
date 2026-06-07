@@ -279,6 +279,61 @@ html.lenis, html.lenis body { height: auto; }
 }
 .animate-aurora { animation: aurora 24s ease-in-out infinite; will-change: transform; }
 
+/* ========================================
+   SCROLL REVEAL — pure CSS (no JS), visible by default if unsupported
+   ======================================== */
+.reveal { opacity: 1; }
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .reveal {
+      opacity: 0;
+      animation: slide-up 0.9s ease-out both;
+      animation-timeline: view();
+      animation-range: entry 4% cover 22%;
+    }
+  }
+}
+
+/* ========================================
+   SCROLL-FILL TEXT (battery-style, pure CSS, no JS)
+   Outlined text whose interior fills neon-green from the bottom,
+   tied to scroll position. Degrades to solid green if unsupported.
+   ======================================== */
+@property --fill-pos {
+  syntax: "<percentage>";
+  inherits: false;
+  initial-value: 100%;
+}
+.fill-text {
+  color: transparent;
+  -webkit-text-stroke: 2px rgba(250, 250, 250, 0.4);
+  background: linear-gradient(
+    to top,
+    #00ff88 var(--fill-pos),
+    rgba(0, 255, 136, 0) var(--fill-pos)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+.battery-track {
+  view-timeline-name: --battery;
+  view-timeline-axis: block;
+}
+@keyframes fill-rise {
+  from { --fill-pos: 0%; }
+  to { --fill-pos: 100%; }
+}
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .fill-text {
+      --fill-pos: 0%;
+      animation: fill-rise linear both;
+      animation-timeline: --battery;
+      animation-range: cover 12% cover 60%;
+    }
+  }
+}
+
 .grain::after {
   content: "";
   position: absolute;
