@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { authenticateProxyRequest, ProxyAuthError } from "@/server/services/proxy-auth";
 import { PROXY_PROVIDERS } from "@/server/services/proxy-providers";
 import { routeModel, getSupportedPrefixes } from "@/server/services/model-router";
@@ -16,7 +16,8 @@ import {
   estimateRequestCost,
   extractMaxOutputTokens,
 } from "@/server/services/proxy-pricing";
-import { reserveBudget, commitSpend } from "@/server/services/budget";
+import { reserveBudget, commitSpend, settledCost } from "@/server/services/budget";
+import { isRedisDegraded } from "@/server/services/redis-client";
 import {
   checkProxyRateLimit,
   checkSessionRpmLimit,
@@ -292,8 +293,12 @@ async function handleUniversalChat(request: NextRequest) {
       clearTimeout(timeout);
     } catch (err) {
       const latencyMs = Date.now() - startTime;
-      commitSpend(session.id, reservation.reserved, 0);
-      logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", 502, 0, 0, latencyMs, request);
+      after(() =>
+        Promise.allSettled([
+          commitSpend(session.id, reservation.reserved, 0),
+          logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", 502, 0, 0, 0, latencyMs, request),
+        ])
+      );
       return NextResponse.json(
         { error: { message: "Failed to reach provider", type: "server_error", details: err instanceof Error ? err.message : undefined } },
         { status: 502, headers: CORS_HEADERS }
@@ -308,9 +313,36 @@ async function handleUniversalChat(request: NextRequest) {
       "X-BlackVault-Provider": targetProvider,
       "X-BlackVault-Gateway": "universal",
     };
-    if (limits.maxBudget !== null) {
-      bvHeaders["X-BlackVault-Budget-Remaining"] = Math.max(0, limits.maxBudget - limits.totalCost).toFixed(4);
+    if (reservation.remaining !== null) {
+      // From the live reservation, not the session row cached at auth time.
+      bvHeaders["X-BlackVault-Budget-Remaining"] = reservation.remaining.toFixed(6);
     }
+    if (isRedisDegraded()) {
+      // Rate limits / real-time budget fell back to their degraded mode.
+      bvHeaders["X-BlackVault-Degraded"] = "redis";
+    }
+
+    // Record spend + audit log once usage is known. Awaited (via after() or the
+    // stream's own lifetime) so serverless platforms can't freeze the function
+    // before the durable spend counter is written.
+    let settled: Promise<unknown> | null = null;
+    const settle = (status: number, input: number, output: number) =>
+      (settled ??= settleOnce(status, input, output));
+    const settleOnce = (status: number, input: number, output: number) => {
+      const latencyMs = Date.now() - startTime;
+      const cost = settledCost({
+        statusCode: status,
+        inputTokens: input,
+        outputTokens: output,
+        computedCost: estimateCost(targetProvider, model, input, output),
+        estimatedCost,
+      });
+      return Promise.allSettled([
+        commitSpend(session.id, reservation.reserved, cost),
+        logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", status, input, output, cost, latencyMs, request),
+        updateCounters(session.id, input + output, cost),
+      ]);
+    };
 
     // ── Handle streaming ─────────────────────────────────
     if (isStreaming && upstreamResponse.body) {
@@ -327,27 +359,37 @@ async function handleUniversalChat(request: NextRequest) {
         outputStream = result.stream;
         getUsage = result.getUsage;
       } else {
-        // OpenAI-compatible — pass through, but track usage
+        // OpenAI-compatible — pass through, but track usage. SSE lines can be
+        // split across network chunks, so buffer partial lines (an unbuffered
+        // parse silently drops a split final usage chunk → request billed $0).
         const acc = { input: 0, output: 0 };
         getUsage = () => acc;
+        const decoder = new TextDecoder();
+        let buffer = "";
+        const parseLine = (line: string) => {
+          if (!line.startsWith("data: ") || line === "data: [DONE]") return;
+          try {
+            const d = JSON.parse(line.slice(6));
+            if (d.usage) {
+              acc.input = d.usage.prompt_tokens ?? acc.input;
+              acc.output = d.usage.completion_tokens ?? acc.output;
+            }
+          } catch { /* skip */ }
+        };
         outputStream = new ReadableStream({
           async pull(ctrl) {
             try {
               const { done, value } = await reader.read();
-              if (done) { ctrl.close(); return; }
-              ctrl.enqueue(value);
-              // Parse for usage
-              const text = new TextDecoder().decode(value);
-              for (const line of text.split("\n")) {
-                if (!line.startsWith("data: ") || line === "data: [DONE]") continue;
-                try {
-                  const d = JSON.parse(line.slice(6));
-                  if (d.usage) {
-                    acc.input = d.usage.prompt_tokens ?? acc.input;
-                    acc.output = d.usage.completion_tokens ?? acc.output;
-                  }
-                } catch { /* skip */ }
+              if (done) {
+                for (const line of buffer.split("\n")) parseLine(line.trim());
+                ctrl.close();
+                return;
               }
+              ctrl.enqueue(value);
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split("\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) parseLine(line.trim());
             } catch { ctrl.close(); }
           },
           cancel() { reader.cancel(); },
@@ -365,13 +407,11 @@ async function handleUniversalChat(request: NextRequest) {
               ctrl.enqueue(value);
             }
           } catch { /* stream error */ } finally {
-            ctrl.close();
-            const latencyMs = Date.now() - startTime;
             const u = getUsage();
-            const cost = estimateCost(targetProvider, model, u.input, u.output);
-            commitSpend(session.id, reservation.reserved, cost);
-            logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", statusCode, u.input, u.output, latencyMs, request);
-            updateCounters(session.id, u.input + u.output, cost);
+            // Settle before closing: once the stream closes the platform may
+            // end the invocation, dropping un-awaited writes.
+            await settle(statusCode, u.input, u.output);
+            try { ctrl.close(); } catch { /* already closed/cancelled */ }
           }
         },
         cancel() { reader.cancel(); },
@@ -387,7 +427,6 @@ async function handleUniversalChat(request: NextRequest) {
 
     // ── Handle non-streaming ─────────────────────────────
     const responseText = await upstreamResponse.text();
-    const latencyMs = Date.now() - startTime;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let openaiResponse: any;
@@ -430,10 +469,7 @@ async function handleUniversalChat(request: NextRequest) {
       }
     }
 
-    const cost = estimateCost(targetProvider, model, usage.input, usage.output);
-    commitSpend(session.id, reservation.reserved, cost);
-    logRequest(session.id, userId, targetProvider, model, "/v1/chat/completions", statusCode, usage.input, usage.output, latencyMs, request);
-    updateCounters(session.id, usage.input + usage.output, cost);
+    after(() => settle(statusCode, usage.input, usage.output));
 
     const responseHeaders = new Headers(CORS_HEADERS);
     responseHeaders.set("Content-Type", "application/json");
@@ -452,30 +488,29 @@ async function handleUniversalChat(request: NextRequest) {
   }
 }
 
-// ── Fire-and-forget helpers ──────────────────────────────
+// ── Post-response writes (callers await them via settle) ─
 
-function logRequest(
+async function logRequest(
   sessionId: string, userId: string, provider: string, model: string,
   endpoint: string, statusCode: number, inputTokens: number, outputTokens: number,
-  latencyMs: number, request: Request
+  cost: number, latencyMs: number, request: Request
 ) {
   const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? request.headers.get("x-real-ip") ?? null;
   const ua = request.headers.get("user-agent") ?? null;
-  const cost = estimateCost(provider, model, inputTokens, outputTokens);
-  db.insert(proxyLogs).values({
+  await db.insert(proxyLogs).values({
     sessionId, userId, provider, model, endpoint, method: "POST", statusCode,
     inputTokens, outputTokens, totalTokens: inputTokens + outputTokens,
-    estimatedCost: cost.toFixed(6), latencyMs, ipAddress: ip, userAgent: ua,
-  }).then(() => {}).catch(() => {});
+    estimatedCost: cost.toFixed(8), latencyMs, ipAddress: ip, userAgent: ua,
+  });
 }
 
-function updateCounters(sessionId: string, totalTokens: number, cost: number) {
-  db.update(proxySessions).set({
+async function updateCounters(sessionId: string, totalTokens: number, cost: number) {
+  await db.update(proxySessions).set({
     totalRequests: sql`${proxySessions.totalRequests} + 1`,
     totalTokensUsed: sql`${proxySessions.totalTokensUsed} + ${totalTokens}`,
-    totalCost: sql`${proxySessions.totalCost} + ${cost}`,
+    totalCost: sql`${proxySessions.totalCost} + ${cost.toFixed(8)}`,
     updatedAt: new Date(),
-  }).where(eq(proxySessions.id, sessionId)).then(() => {}).catch(() => {});
+  }).where(eq(proxySessions.id, sessionId));
 }
 
 export const POST = handleUniversalChat;

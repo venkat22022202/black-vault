@@ -112,12 +112,20 @@ tools and firewalls; this *closes the loop*. See
 | [0002](./design/0002-mcp-credential-broker.md) | MCP credential broker | ✅ Inc 1 implemented |
 | [0003](./design/0003-egress-firewall.md) | Egress firewall (agent credential firewall) | 🚧 Policy engine + route implemented |
 | [0004](./design/0004-proving-ground.md) | Proving Ground (attack → harden → prove + score) | 🚧 Core engine implemented |
+| [0005](./design/0005-reliability-and-money-math.md) | Reliability & money math (Redis breaker · health · cost precision · e2e demo) | ✅ Implemented |
 
 ---
 
 ## 4. Known issues & follow-ups (carried from Phase 0)
 
 - **Cost is estimated**, not reconciled with provider billing — see Phase 2.
+- **Live deploy (2026-10-04):** every `bvt_` request took ~9.6 s because Redis was
+  unreachable (retry backoff — see design 0005); Clerk runs on a *development*
+  instance. Fix: restore/replace Upstash, move Clerk to production, run
+  `scripts/sql/0001-cost-precision.sql`, and monitor `/api/health`.
+- MCP + egress routes still write audit logs fire-and-forget (gateway + direct
+  proxy now settle via `after()`); direct proxy skips the model allowlist when
+  no model is parseable — review (design 0005 §6).
 - **Budget seed** reads a ≤60 s-stale cached DB total on a cold Redis key;
   self-corrects on subsequent requests.
 - **Universal gateway cross-key resolution**: a token bound to vault key A can

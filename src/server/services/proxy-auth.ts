@@ -3,6 +3,7 @@ import { proxySessions, vaultKeys } from "@/server/db/schema";
 import { eq, and } from "drizzle-orm";
 import { hashProxyToken } from "./proxy-token";
 import { cached, invalidateCache } from "./redis";
+import { isExhausted } from "./budget";
 
 const SESSION_CACHE_TTL = 60; // seconds
 
@@ -189,7 +190,7 @@ export async function authenticateProxyRequest(
   }
 
   // Budget enforcement: session-level
-  if (limits.maxBudget !== null && limits.totalCost >= limits.maxBudget) {
+  if (limits.maxBudget !== null && isExhausted(limits.totalCost, limits.maxBudget)) {
     throw new ProxyAuthError(
       402,
       `Session budget exhausted ($${limits.totalCost.toFixed(4)} / $${limits.maxBudget.toFixed(4)})`

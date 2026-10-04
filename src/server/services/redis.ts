@@ -1,40 +1,25 @@
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (_redis) return _redis;
-  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
-  if (!url || !token) {
-    return null;
-  }
-  _redis = new Redis({ url, token });
-  return _redis;
-}
+import { getRedis, recordRedisFailure, recordRedisSuccess, withRedis } from "./redis-client";
 
 /**
- * Cache helper — falls back to direct fetcher if Redis not configured
+ * Cache helper — falls back to the direct fetcher when Redis is not configured
+ * or unavailable (see redis-client.ts for the timeout + circuit breaker).
  */
 export async function cached<T>(
   key: string,
   ttlSeconds: number,
   fetcher: () => Promise<T>
 ): Promise<T> {
-  const redis = getRedis();
-  if (!redis) return fetcher();
-
   try {
-    const hit = await redis.get<T>(key);
+    const hit = await withRedis((redis) => redis.get<T>(key));
     if (hit !== null && hit !== undefined) return hit;
   } catch {
-    // Redis down — fall through to fetcher
+    // Redis down or not configured — fall through to fetcher
   }
 
   const data = await fetcher();
 
   try {
-    await redis.set(key, JSON.stringify(data), { ex: ttlSeconds });
+    await withRedis((redis) => redis.set(key, JSON.stringify(data), { ex: ttlSeconds }));
   } catch {
     // Best-effort cache write
   }
@@ -50,14 +35,20 @@ export async function invalidatePublicStats(): Promise<void> {
 }
 
 /**
- * Invalidate a cache key
+ * Invalidate a cache key.
+ *
+ * Deliberately bypasses the circuit breaker: this is how a kill switch evicts a
+ * cached proxy session, and skipping it because the circuit opened on an
+ * earlier blip would let a revoked token keep working for the cache TTL (60s).
+ * Still bounded by the client's per-request timeout.
  */
 export async function invalidateCache(key: string): Promise<void> {
   const redis = getRedis();
   if (!redis) return;
   try {
     await redis.del(key);
+    recordRedisSuccess();
   } catch {
-    // Best-effort
+    recordRedisFailure();
   }
 }

@@ -140,9 +140,21 @@ const nebius: ProviderConfig = {
   stripHeaders: ["authorization"],
 };
 
+/**
+ * Operator-only override of a provider's upstream origin, set via env — e.g.
+ * BLACKVAULT_UPSTREAM_OPENAI=http://localhost:11434 to govern a local Ollama /
+ * vLLM server, or point at a mock for end-to-end tests. Applies to the direct
+ * proxy and to OpenAI-compatible routing in the universal gateway.
+ */
+function withUpstreamOverride(name: string, config: ProviderConfig): ProviderConfig {
+  const override = process.env[`BLACKVAULT_UPSTREAM_${name.toUpperCase()}`]?.trim();
+  if (!override) return config;
+  return { ...config, baseUrl: override.replace(/\/+$/, "") };
+}
+
 export const PROXY_PROVIDERS: Record<string, ProviderConfig> = {
-  openai,
-  anthropic,
-  google,
-  nebius,
+  openai: withUpstreamOverride("openai", openai),
+  anthropic: withUpstreamOverride("anthropic", anthropic),
+  google: withUpstreamOverride("google", google),
+  nebius: withUpstreamOverride("nebius", nebius),
 };

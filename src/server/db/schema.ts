@@ -225,7 +225,10 @@ export const proxySessions = pgTable("proxy_sessions", {
   expiresAt: timestamp("expires_at", { withTimezone: true }),
   totalRequests: integer("total_requests").default(0).notNull(),
   totalTokensUsed: integer("total_tokens_used").default(0).notNull(),
-  totalCost: decimal("total_cost", { precision: 10, scale: 4 }).default("0").notNull(),
+  // Scale 8: per-request costs are often < $0.0001, and `total_cost + cost` is
+  // rounded to the column scale on every increment (scale 4 recorded 1,000 ×
+  // $0.000045 as $0.0000). Migration: scripts/sql/0001-cost-precision.sql
+  totalCost: decimal("total_cost", { precision: 18, scale: 8 }).default("0").notNull(),
   // Per-session rate limiting & access controls
   rateLimitRpm: integer("rate_limit_rpm"),            // requests per minute (null = use global default)
   rateLimitRpd: integer("rate_limit_rpd"),            // requests per day (null = unlimited)
@@ -255,7 +258,7 @@ export const proxyLogs = pgTable("proxy_logs", {
   inputTokens: integer("input_tokens").default(0).notNull(),
   outputTokens: integer("output_tokens").default(0).notNull(),
   totalTokens: integer("total_tokens").default(0).notNull(),
-  estimatedCost: decimal("estimated_cost", { precision: 10, scale: 6 }).default("0").notNull(),
+  estimatedCost: decimal("estimated_cost", { precision: 14, scale: 8 }).default("0").notNull(),
   latencyMs: integer("latency_ms").notNull(),
   ipAddress: text("ip_address"),
   userAgent: text("user_agent"),
