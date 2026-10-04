@@ -1,35 +1,21 @@
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 import { TRPCError } from "@trpc/server";
+import { getRedis, redisFailMode, withRedis } from "./redis-client";
 
-let _redis: Redis | null = null;
-
-function getRedis(): Redis | null {
-  if (_redis) return _redis;
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    return null;
-  }
-  _redis = new Redis({
-    url: process.env.UPSTASH_REDIS_REST_URL.trim(),
-    token: process.env.UPSTASH_REDIS_REST_TOKEN.trim(),
-  });
-  return _redis;
-}
+type Window = `${number} ${"s" | "m" | "h" | "d"}`;
 
 const limiters: Record<string, Ratelimit | null> = {};
 
 function getLimiter(key: string, requests: number, window: string): Ratelimit | null {
   if (limiters[key] !== undefined) return limiters[key];
   const redis = getRedis();
-  if (!redis) {
-    limiters[key] = null;
-    return null;
-  }
-  limiters[key] = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"s" | "m" | "h" | "d"}`),
-    prefix: `bv:rl:${key}`,
-  });
+  limiters[key] = redis
+    ? new Ratelimit({
+        redis,
+        limiter: Ratelimit.slidingWindow(requests, window as Window),
+        prefix: `bv:rl:${key}`,
+      })
+    : null;
   return limiters[key];
 }
 
@@ -41,7 +27,7 @@ function createDynamicLimiter(prefix: string, requests: number, window: string):
   if (!redis) return null;
   return new Ratelimit({
     redis,
-    limiter: Ratelimit.slidingWindow(requests, window as `${number} ${"s" | "m" | "h" | "d"}`),
+    limiter: Ratelimit.slidingWindow(requests, window as Window),
     prefix,
   });
 }
@@ -53,22 +39,8 @@ const LIMITS = {
   proxyRequest: { requests: 200, window: "1 m" },
 } as const;
 
-export async function checkRateLimit(
-  limiterKey: keyof typeof LIMITS,
-  userId: string
-): Promise<void> {
-  const config = LIMITS[limiterKey];
-  const limiter = getLimiter(limiterKey, config.requests, config.window);
-  if (!limiter) return; // Skip if Redis not configured
-
-  const result = await limiter.limit(userId);
-  if (!result.success) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: `Rate limit exceeded. Try again in ${Math.ceil(result.reset - Date.now() / 1000)}s.`,
-    });
-  }
-}
+/** How long a caller is told to back off when limits can't be evaluated (fail-closed). */
+const UNAVAILABLE_RETRY_AFTER_SECONDS = 30;
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -76,6 +48,75 @@ export interface RateLimitResult {
   remaining: number;
   reset: number; // epoch ms
   retryAfter?: number; // seconds
+  /** True when the limit could not be evaluated because Redis is unavailable. */
+  degraded?: boolean;
+}
+
+/** Seconds until `resetMs` (epoch ms), never negative. */
+export function secondsUntil(resetMs: number, now = Date.now()): number {
+  return Math.max(0, Math.ceil((resetMs - now) / 1000));
+}
+
+/**
+ * Evaluate a limiter. Redis not configured → allow (local/dev mode). Redis
+ * configured but failing → allow or deny per BLACKVAULT_REDIS_FAIL_MODE, and
+ * flag the result as degraded so routes can surface it.
+ */
+async function evaluate(
+  limiter: Ratelimit | null,
+  identifier: string,
+  limit: number,
+  windowMs: number
+): Promise<RateLimitResult> {
+  if (!limiter) return { allowed: true, limit, remaining: limit, reset: Date.now() + windowMs };
+
+  let result;
+  try {
+    result = await withRedis(() => limiter.limit(identifier));
+  } catch {
+    const allowed = redisFailMode() === "open";
+    return {
+      allowed,
+      limit,
+      remaining: allowed ? limit : 0,
+      reset: Date.now() + windowMs,
+      retryAfter: allowed ? undefined : UNAVAILABLE_RETRY_AFTER_SECONDS,
+      degraded: true,
+    };
+  }
+
+  if (!result.success) {
+    return {
+      allowed: false,
+      limit: result.limit,
+      remaining: result.remaining,
+      reset: result.reset,
+      retryAfter: secondsUntil(result.reset),
+    };
+  }
+  return {
+    allowed: true,
+    limit: result.limit,
+    remaining: result.remaining,
+    reset: result.reset,
+  };
+}
+
+export async function checkRateLimit(
+  limiterKey: keyof typeof LIMITS,
+  userId: string
+): Promise<void> {
+  const config = LIMITS[limiterKey];
+  const limiter = getLimiter(limiterKey, config.requests, config.window);
+  const result = await evaluate(limiter, userId, config.requests, 60_000);
+  if (!result.allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: result.degraded
+        ? "Rate limiting is temporarily unavailable. Try again shortly."
+        : `Rate limit exceeded. Try again in ${secondsUntil(result.reset)}s.`,
+    });
+  }
 }
 
 /**
@@ -86,24 +127,7 @@ export async function checkProxyRateLimit(
 ): Promise<RateLimitResult> {
   const config = LIMITS.proxyRequest;
   const limiter = getLimiter("proxyRequest", config.requests, config.window);
-  if (!limiter) return { allowed: true, limit: config.requests, remaining: config.requests, reset: Date.now() + 60000 };
-
-  const result = await limiter.limit(userId);
-  if (!result.success) {
-    return {
-      allowed: false,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
-    };
-  }
-  return {
-    allowed: true,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  };
+  return evaluate(limiter, userId, config.requests, 60_000);
 }
 
 /**
@@ -115,24 +139,7 @@ export async function checkSessionRpmLimit(
   rpm: number
 ): Promise<RateLimitResult> {
   const limiter = createDynamicLimiter(`bv:sess:rpm:${rpm}`, rpm, "1 m");
-  if (!limiter) return { allowed: true, limit: rpm, remaining: rpm, reset: Date.now() + 60000 };
-
-  const result = await limiter.limit(sessionId);
-  if (!result.success) {
-    return {
-      allowed: false,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
-    };
-  }
-  return {
-    allowed: true,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  };
+  return evaluate(limiter, sessionId, rpm, 60_000);
 }
 
 /**
@@ -143,22 +150,5 @@ export async function checkSessionRpdLimit(
   rpd: number
 ): Promise<RateLimitResult> {
   const limiter = createDynamicLimiter(`bv:sess:rpd:${rpd}`, rpd, "1 d");
-  if (!limiter) return { allowed: true, limit: rpd, remaining: rpd, reset: Date.now() + 86400000 };
-
-  const result = await limiter.limit(sessionId);
-  if (!result.success) {
-    return {
-      allowed: false,
-      limit: result.limit,
-      remaining: result.remaining,
-      reset: result.reset,
-      retryAfter: Math.ceil((result.reset - Date.now()) / 1000),
-    };
-  }
-  return {
-    allowed: true,
-    limit: result.limit,
-    remaining: result.remaining,
-    reset: result.reset,
-  };
+  return evaluate(limiter, sessionId, rpd, 86_400_000);
 }

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { authenticateProxyRequest, ProxyAuthError } from "@/server/services/proxy-auth";
 import type { SessionLimits } from "@/server/services/proxy-auth";
 import { PROXY_PROVIDERS, type UsageAccumulator } from "@/server/services/proxy-providers";
@@ -8,7 +8,8 @@ import {
   estimateRequestCost,
   extractMaxOutputTokens,
 } from "@/server/services/proxy-pricing";
-import { reserveBudget, commitSpend } from "@/server/services/budget";
+import { reserveBudget, commitSpend, settledCost } from "@/server/services/budget";
+import { isRedisDegraded } from "@/server/services/redis-client";
 import {
   checkProxyRateLimit,
   checkSessionRpmLimit,
@@ -43,6 +44,7 @@ function blackvaultHeaders(
   sessionId: string,
   limits: SessionLimits,
   cost: number,
+  liveRemaining: number | null = null,
 ): Record<string, string> {
   const headers: Record<string, string> = {
     "X-BlackVault-Session": sessionId,
@@ -50,9 +52,13 @@ function blackvaultHeaders(
     "X-BlackVault-Cost": limits.totalCost.toFixed(6),
   };
   if (limits.maxBudget !== null) {
-    const remaining = Math.max(0, limits.maxBudget - limits.totalCost - cost);
+    // Prefer the live reservation over the session row cached at auth time.
+    const remaining = Math.max(0, (liveRemaining ?? limits.maxBudget - limits.totalCost) - cost);
     headers["X-BlackVault-Budget-Limit"] = limits.maxBudget.toFixed(4);
-    headers["X-BlackVault-Budget-Remaining"] = remaining.toFixed(4);
+    headers["X-BlackVault-Budget-Remaining"] = remaining.toFixed(6);
+  }
+  if (isRedisDegraded()) {
+    headers["X-BlackVault-Degraded"] = "redis";
   }
   if (limits.rateLimitRpm !== null) {
     headers["X-BlackVault-RPM-Limit"] = String(limits.rateLimitRpm);
@@ -297,6 +303,27 @@ async function handleProxy(
     );
   }
 
+  // Record spend + audit log once usage is known. Awaited (via after() or the
+  // stream's own lifetime) so serverless platforms can't freeze the function
+  // before the durable spend counter is written.
+  let settled: Promise<unknown> | null = null;
+  const settle = (status: number, input: number, output: number) =>
+    (settled ??= settleOnce(status, input, output));
+  const settleOnce = (status: number, input: number, output: number) => {
+    const latencyMs = Date.now() - startTime;
+    const computedCost = estimateCost(providerName, model, input, output);
+    // Only inference calls (a model was identified) keep the reservation when
+    // usage is unknown; e.g. GET /v1/models legitimately costs nothing.
+    const cost = model
+      ? settledCost({ statusCode: status, inputTokens: input, outputTokens: output, computedCost, estimatedCost })
+      : computedCost;
+    return Promise.allSettled([
+      commitSpend(session.id, reservation.reserved, cost),
+      logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, status, input, output, input + output, cost, latencyMs, request),
+      updateSessionCounters(session.id, input + output, cost),
+    ]);
+  };
+
   // Forward request to provider
   let upstreamResponse: Response;
   try {
@@ -312,10 +339,13 @@ async function handleProxy(
 
     clearTimeout(timeout);
   } catch (err) {
-    const latencyMs = Date.now() - startTime;
     // Refund the reservation — no cost was incurred.
-    commitSpend(session.id, reservation.reserved, 0);
-    logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, 502, 0, 0, 0, latencyMs, request);
+    after(() =>
+      Promise.allSettled([
+        commitSpend(session.id, reservation.reserved, 0),
+        logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, 502, 0, 0, 0, 0, Date.now() - startTime, request),
+      ])
+    );
     return NextResponse.json(
       { error: "Failed to reach provider", details: err instanceof Error ? err.message : "Unknown error" },
       { status: 502, headers: CORS_HEADERS }
@@ -351,15 +381,10 @@ async function handleProxy(
                 providerConfig.parseStreamChunk(line.trim(), acc);
               }
             }
+            // Settle before closing: once the stream closes the platform may
+            // end the invocation, dropping un-awaited writes.
+            await settle(statusCode, acc.input, acc.output);
             controller.close();
-
-            // Log usage after stream ends
-            const latencyMs = Date.now() - startTime;
-            const totalTokens = acc.input + acc.output;
-            const cost = estimateCost(providerName, model, acc.input, acc.output);
-            commitSpend(session.id, reservation.reserved, cost);
-            logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, statusCode, acc.input, acc.output, totalTokens, latencyMs, request);
-            updateSessionCounters(session.id, totalTokens, cost);
             return;
           }
 
@@ -374,18 +399,22 @@ async function handleProxy(
             providerConfig.parseStreamChunk(line.trim(), acc);
           }
         } catch {
+          await settle(statusCode, acc.input, acc.output);
           controller.close();
         }
       },
-      cancel() {
+      async cancel() {
+        // Client disconnected mid-stream: still settle (usage unknown → the
+        // reservation is kept, so walking away early isn't free).
         reader.cancel();
+        await settle(statusCode, acc.input, acc.output);
       },
     });
 
     const responseHeaders = mergedResponseHeaders({
       "Content-Type": upstreamResponse.headers.get("content-type") ?? "text/event-stream",
       "Cache-Control": "no-store",
-      ...blackvaultHeaders(session.id, limits, 0),
+      ...blackvaultHeaders(session.id, limits, 0, reservation.remaining),
     });
 
     return new Response(stream, {
@@ -396,7 +425,6 @@ async function handleProxy(
 
   // Non-streaming response
   const responseBody = await upstreamResponse.text();
-  const latencyMs = Date.now() - startTime;
 
   let usage = { input: 0, output: 0 };
   try {
@@ -406,17 +434,13 @@ async function handleProxy(
     // Non-JSON or no usage data
   }
 
-  const totalTokens = usage.input + usage.output;
   const cost = estimateCost(providerName, model, usage.input, usage.output);
-
-  commitSpend(session.id, reservation.reserved, cost);
-  logProxyRequest(session.id, userId, providerName, model, `/${path}`, request.method, statusCode, usage.input, usage.output, totalTokens, latencyMs, request);
-  updateSessionCounters(session.id, totalTokens, cost);
+  after(() => settle(statusCode, usage.input, usage.output));
 
   const responseHeaders = mergedResponseHeaders({
     "Content-Type": upstreamResponse.headers.get("content-type") ?? "application/json",
     "Cache-Control": "no-store",
-    ...blackvaultHeaders(session.id, limits, cost),
+    ...blackvaultHeaders(session.id, limits, cost, reservation.remaining),
   });
 
   return new Response(responseBody, {
@@ -431,8 +455,8 @@ async function handleProxy(
   }
 }
 
-// Fire-and-forget logging
-function logProxyRequest(
+// Post-response writes (callers await them via settle)
+async function logProxyRequest(
   sessionId: string,
   userId: string,
   provider: string,
@@ -443,6 +467,7 @@ function logProxyRequest(
   inputTokens: number,
   outputTokens: number,
   totalTokens: number,
+  cost: number,
   latencyMs: number,
   request: Request
 ) {
@@ -451,9 +476,8 @@ function logProxyRequest(
     request.headers.get("x-real-ip") ??
     null;
   const ua = request.headers.get("user-agent") ?? null;
-  const cost = estimateCost(provider, model, inputTokens, outputTokens);
 
-  db.insert(proxyLogs)
+  await db.insert(proxyLogs)
     .values({
       sessionId,
       userId,
@@ -465,31 +489,26 @@ function logProxyRequest(
       inputTokens,
       outputTokens,
       totalTokens,
-      estimatedCost: cost.toFixed(6),
+      estimatedCost: cost.toFixed(8),
       latencyMs,
       ipAddress: ip,
       userAgent: ua,
-    })
-    .then(() => {})
-    .catch(() => {});
+    });
 }
 
-// Fire-and-forget counter update
-function updateSessionCounters(
+async function updateSessionCounters(
   sessionId: string,
   totalTokens: number,
   cost: number
 ) {
-  db.update(proxySessions)
+  await db.update(proxySessions)
     .set({
       totalRequests: sql`${proxySessions.totalRequests} + 1`,
       totalTokensUsed: sql`${proxySessions.totalTokensUsed} + ${totalTokens}`,
-      totalCost: sql`${proxySessions.totalCost} + ${cost}`,
+      totalCost: sql`${proxySessions.totalCost} + ${cost.toFixed(8)}`,
       updatedAt: new Date(),
     })
-    .where(eq(proxySessions.id, sessionId))
-    .then(() => {})
-    .catch(() => {});
+    .where(eq(proxySessions.id, sessionId));
 }
 
 export const GET = handleProxy;

@@ -185,6 +185,29 @@ The agent never sees a provider key, and revoking the `bvt_` token (or hitting t
 | **Team API key sharing** | Share proxy tokens instead of the real key. Audit who used what. Revoke individuals without rotating. |
 | **CI/CD pipelines** | Short-lived proxy tokens (1h expiry) for CI jobs. Auto-expire, no cleanup needed. |
 
+## Try it in 2 minutes (no accounts needed)
+
+An end-to-end demo runs the real app against local Postgres + Redis and a mock
+LLM, and asserts every guarantee: key isolation, model allowlist, rate limits,
+sequential and 20-way concurrent budget caps, streaming cost, the kill switch,
+and a live Redis outage.
+
+```bash
+npm install
+createdb blackvault_demo && redis-server --daemonize yes
+DATABASE_URL=postgres://localhost/blackvault_demo REDIS_PORT=6379 scripts/demo/run.sh
+```
+
+```
+5. Budget cap $0.0002 — 20 concurrent requests (atomic reservation)
+  ✓ 20 parallel → 7 allowed, 13 refused with 402
+8. Redis dies — bounded latency, visible degradation, recovery
+  ✓ first request after outage: 200 in 65ms
+  ✓ /api/health → 503 degraded (an uptime monitor would page you)
+...
+All checks passed.
+```
+
 ## Quick Start
 
 ### 1. Clone and install
@@ -207,7 +230,7 @@ Fill in `.env.local`:
 |----------|--------|
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | [Clerk](https://clerk.com) |
 | `CLERK_SECRET_KEY` | [Clerk](https://clerk.com) |
-| `DATABASE_URL` | [Neon](https://neon.tech) |
+| `DATABASE_URL` | [Neon](https://neon.tech), or any Postgres (`postgres://…`) |
 | `UPSTASH_REDIS_REST_URL` | [Upstash](https://upstash.com) |
 | `UPSTASH_REDIS_REST_TOKEN` | [Upstash](https://upstash.com) |
 | `VAULT_MASTER_KEY` | `openssl rand -hex 32` |
@@ -348,11 +371,23 @@ src/
 - Proxy tokens SHA-256 hashed before storage -- plaintext never persisted
 - Session lookups Redis-cached (60s TTL) for fast revocation
 - **Three-tier rate limiting:** global (200 RPM/user) + per-session RPM + per-session RPD via Redis sliding window
-- **Budget enforcement:** session-level spend caps block at 402 when exhausted
+- **Budget enforcement:** session-level spend caps block at 402 when exhausted; spend is counted in integer nano-dollars, atomically, so concurrent requests can't overshoot by more than one request
 - **Model restrictions:** per-session model allowlists prevent unauthorized model usage
 - **IP allowlisting:** per-session IP restrictions enforced at auth time
 - CORS allows `*` on proxy (tokens are the auth boundary, not origin)
 - All secrets are environment variables -- never in code
+- **Bounded failure:** Redis calls are capped (800 ms, 1 retry) behind a circuit breaker. If Redis dies, requests keep flowing in a declared mode (`BLACKVAULT_REDIS_FAIL_MODE=open|closed`), responses carry `X-BlackVault-Degraded: redis`, and `/api/health` returns 503. See [design 0005](docs/design/0005-reliability-and-money-math.md)
+
+## Health
+
+`GET /api/health` reports database + Redis status and latency (no auth, no error details).
+It returns `503` when any configured dependency is down — point an uptime monitor at it.
+
+```json
+{ "status": "ok", "checks": { "database": { "status": "ok", "latencyMs": 3 },
+  "redis": { "status": "ok", "latencyMs": 2, "lastFailureAt": null } },
+  "redisFailMode": "open", "version": "a1b2c3d" }
+```
 
 ## Deploy
 
@@ -365,10 +400,16 @@ src/
 
 ### Self-hosted
 
+Any Postgres works (node-postgres is used for non-Neon URLs). Redis is optional;
+without it, rate limits are off and budgets use the database total.
+
 ```bash
 npm run build
 npm start
 ```
+
+To govern a local model server, point a provider at it:
+`BLACKVAULT_UPSTREAM_OPENAI=http://localhost:11434` (Ollama, vLLM, …).
 
 ## Roadmap
 
